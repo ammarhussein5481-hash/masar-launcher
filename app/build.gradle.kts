@@ -3,9 +3,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// CI passes the signing key through the environment. Without it (a local
-// build), the release APK is signed with the debug key so it still installs.
-val keystoreFile: String? = System.getenv("KEYSTORE_FILE")
+// Signing: a key from the environment if CI provides one, otherwise the public
+// sideload key in signing/ (see signing/README.md). Either way every build has a
+// stable signature, so updates install over the previous version.
+val envKeystore: String? = System.getenv("KEYSTORE_FILE")
 
 android {
     namespace = "cloud.ammarhussein.masar"
@@ -21,11 +22,16 @@ android {
 
     signingConfigs {
         create("release") {
-            if (keystoreFile != null) {
-                storeFile = file(keystoreFile)
+            if (envKeystore != null) {
+                storeFile = file(envKeystore)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                storeFile = rootProject.file("signing/sideload.jks")
+                storePassword = "masar-sideload"
+                keyAlias = "masar"
+                keyPassword = "masar-sideload"
             }
         }
     }
@@ -33,11 +39,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = if (keystoreFile != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

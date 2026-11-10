@@ -32,7 +32,7 @@ jobs:
             echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
             echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
           else
-            echo "No signing secret set: building with the debug key."
+            echo "No signing secret set: using the public sideload key in signing/."
           fi
 
       - name: Version name
