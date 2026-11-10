@@ -21,6 +21,7 @@ driver needs, with targets big enough to hit without looking twice.
   - **Compass** that turns with the direction of travel, plus coordinates and altitude.
   - **Map** that follows the car. Roads already driven stay visible offline, and a tap opens your navigation app.
   - **Weather** where you are: current conditions and the next three days.
+- **A home handle** over full-screen apps such as CarPlay: swipe up from the bottom edge to come back. See [Home handle](#home-handle).
 - **Scales itself.** Every size is a fraction of the screen height, so it looks the same on any resolution or density.
 - No ads, no trial, no account.
 
@@ -43,6 +44,40 @@ how they know what to send back. The home page works with no connection at all.
 | Tap **+** / **−** on the map | Zooms in or out |
 | Tap the weather | Refreshes it now |
 | Press Home or Back | Returns to the home page |
+| Long-press the dots at the bottom | Turns the home handle on or off |
+| Swipe up from the bottom edge, in another app | Returns to Masar (when the home handle is on) |
+
+## Home handle
+
+Full-screen apps such as CarPlay in the Carlinkit AutoKit app hide the
+system navigation bar, so there is no Home button to press. While Masar is
+not on screen it keeps a thin strip along the bottom edge of the screen, on
+top of every other app, with a short faint pill in the middle. **Swipe up**
+from it to bring Masar's home page back. A plain tap does nothing, so
+brushing the bottom edge never presses CarPlay's bottom row by accident.
+The strip is 2% of the screen height tall and disappears whenever Masar
+itself is showing.
+
+**Turning it off and on:** long-press the two page dots at the bottom of
+Masar. A message says which way it went, and the choice is remembered. It is
+on by default.
+
+It runs as a foreground service, so Android keeps it alive while Masar is in
+the background for a whole drive. A quiet "Home handle is on" notification is
+the price of that. After a reboot it comes back as soon as Masar starts as
+the home app.
+
+**Permission:** the handle draws over other apps, which needs the "Display
+over other apps" permission. Masar opens that system screen for you the
+first time (and whenever you turn the handle on without it). On head units
+where that screen is missing or doesn't stick, grant it over adb:
+
+```bash
+adb shell appops set cloud.ammarhussein.masar SYSTEM_ALERT_WINDOW allow
+```
+
+Then press Home (or restart Masar) and the handle appears in other apps.
+To take the permission away again, use `deny` instead of `allow`.
 
 ## Install
 
@@ -51,6 +86,7 @@ Download `masar.apk` from the [latest release](../../releases/latest), then:
 ```bash
 adb install -r masar.apk
 adb shell pm grant cloud.ammarhussein.masar android.permission.ACCESS_FINE_LOCATION
+adb shell appops set cloud.ammarhussein.masar SYSTEM_ALERT_WINDOW allow
 adb shell cmd package set-home-activity cloud.ammarhussein.masar/.MainActivity
 adb shell input keyevent HOME
 ```

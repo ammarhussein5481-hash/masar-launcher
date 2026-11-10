@@ -60,6 +60,9 @@ class AppEntry(val label: String, val component: ComponentName, val icon: Drawab
  * Page 2, drive: a compass, a small map that follows the car, and the weather.
  * Swipe sideways or tap the dots at the bottom to change page.
  *
+ * Long-press the dots to turn the home handle ([HandleService]) on or off: a
+ * strip over full-screen apps such as CarPlay that swipes back to this screen.
+ *
  * Every size is derived from the screen height (see [applySizes]), so the layout
  * looks the same on any head unit resolution or density.
  */
@@ -169,7 +172,12 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.zoomIn).setOnClickListener { zoomMap(1) }
         findViewById<View>(R.id.zoomOut).setOnClickListener { zoomMap(-1) }
         findViewById<View>(R.id.weatherCard).setOnClickListener { refreshWeather(true) }
-        findViewById<View>(R.id.pager).setOnClickListener { showPage(1 - page) }
+        val pager = findViewById<View>(R.id.pager)
+        pager.setOnClickListener { showPage(1 - page) }
+        pager.setOnLongClickListener {
+            toggleHandle()
+            true
+        }
         loadSavedWeather()
         showPage(0)
 
@@ -220,6 +228,7 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        HandleService.homeVisible = true
         startGps()
         if (!netRegistered) {
             try {
@@ -234,8 +243,15 @@ class MainActivity : Activity() {
         ui.postDelayed(staleCheck, 2000)
     }
 
+    /** Also runs on Home while already in front, so a permission granted over adb takes effect then. */
+    override fun onResume() {
+        super.onResume()
+        syncHandle()
+    }
+
     override fun onStop() {
         super.onStop()
+        HandleService.homeVisible = false
         stopGps()
         if (netRegistered) {
             try {
@@ -329,6 +345,53 @@ class MainActivity : Activity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         startGps()
+    }
+
+    // ---------------------------------------------------------------- home handle
+
+    /**
+     * Starts or stops the home handle service to match the saved setting. If the
+     * overlay permission is missing, opens the system screen for it, but only
+     * once by itself; after that only when the handle is turned on by hand.
+     */
+    private fun syncHandle() {
+        val service = Intent(this, HandleService::class.java)
+        if (!HandleService.enabled(this)) {
+            stopService(service)
+            return
+        }
+        if (Settings.canDrawOverlays(this)) {
+            try {
+                startForegroundService(service)
+            } catch (ex: Exception) {
+                // The system refused; the floating dot in AutoKit still works.
+            }
+        } else if (!prefs.getBoolean(PREF_HANDLE_ASKED, false)) {
+            prefs.edit().putBoolean(PREF_HANDLE_ASKED, true).apply()
+            askForOverlay()
+        }
+    }
+
+    private fun toggleHandle() {
+        val on = !HandleService.enabled(this)
+        prefs.edit().putBoolean(HandleService.PREF_ENABLED, on).apply()
+        if (on && !Settings.canDrawOverlays(this)) {
+            askForOverlay()
+            return
+        }
+        Toast.makeText(this, if (on) R.string.handle_on else R.string.handle_off, Toast.LENGTH_LONG).show()
+        syncHandle()
+    }
+
+    /** The system "Display over other apps" screen for Masar, or its app info if that is missing. */
+    private fun askForOverlay() {
+        Toast.makeText(this, R.string.handle_need_permission, Toast.LENGTH_LONG).show()
+        val pkg = Uri.parse("package:$packageName")
+        try {
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg))
+        } catch (ex: Exception) {
+            open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, pkg), getString(R.string.app_name))
+        }
     }
 
     // ---------------------------------------------------------------- sizing
@@ -917,6 +980,7 @@ class MainActivity : Activity() {
     companion object {
         private const val SLOTS = 8
         private const val AUTOKIT = "cn.manstep.phonemirrorBox"
+        private const val PREF_HANDLE_ASKED = "handle_asked"
 
         private const val NET_OFFLINE = 0
         private const val NET_NO_INTERNET = 1

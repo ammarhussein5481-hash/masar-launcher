@@ -23,6 +23,13 @@
     <string name="tile_empty">empty</string>
     <string name="cant_open">Can\'t open %1$s</string>
 
+    <string name="handle_channel">Home handle</string>
+    <string name="handle_running">Home handle is on</string>
+    <string name="handle_running_detail">Swipe up from the bottom edge to return to Masar</string>
+    <string name="handle_on">Home handle on. Swipe up from the bottom edge to return here.</string>
+    <string name="handle_off">Home handle off</string>
+    <string name="handle_need_permission">Allow Masar to display over other apps to use the home handle</string>
+
     <string name="compass_title">Compass</string>
     <string name="compass_hint">Drive to get a heading</string>
     <string name="altitude">Altitude %1$d m</string>
