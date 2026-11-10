@@ -6,6 +6,8 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Online / offline indicator -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Map tiles and the weather forecast on the second page -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- "Uninstall" in the app menu opens the system uninstall dialog -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 

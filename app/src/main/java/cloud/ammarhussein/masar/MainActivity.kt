@@ -13,6 +13,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
+import android.location.Geocoder
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
@@ -26,8 +27,11 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
+import android.text.format.DateFormat
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
@@ -36,6 +40,10 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -43,10 +51,14 @@ import kotlin.math.roundToInt
 class AppEntry(val label: String, val component: ComponentName, val icon: Drawable)
 
 /**
- * The whole launcher is this one screen.
+ * The whole launcher is this one activity, with two pages side by side.
  *
- * Left: clock, date, GPS speed and heading, and two status lines (GPS, internet).
- * Right: eight large tiles. The first seven hold apps, the last opens "All apps".
+ * Page 1, home. Left: clock, date, GPS speed and heading, and two status lines
+ * (GPS, internet). Right: eight large tiles. The first seven hold apps, the last
+ * opens "All apps".
+ *
+ * Page 2, drive: a compass, a small map that follows the car, and the weather.
+ * Swipe sideways or tap the dots at the bottom to change page.
  *
  * Every size is derived from the screen height (see [applySizes]), so the layout
  * looks the same on any head unit resolution or density.
@@ -67,6 +79,21 @@ class MainActivity : Activity() {
     private lateinit var statusNet: TextView
     private lateinit var grid: GridView
 
+    private lateinit var page2: View
+    private lateinit var dot0: View
+    private lateinit var dot1: View
+    private lateinit var compass: CompassView
+    private lateinit var coords: TextView
+    private lateinit var altitude: TextView
+    private lateinit var map: TileMapView
+    private lateinit var weatherPlace: TextView
+    private lateinit var weatherSymbol: TextView
+    private lateinit var weatherTemp: TextView
+    private lateinit var weatherCond: TextView
+    private lateinit var weatherDetail: TextView
+    private lateinit var weatherNote: TextView
+    private lateinit var forecast: LinearLayout
+
     private val tiles = ArrayList<View>()
     private var apps: List<AppEntry> = emptyList()
     private var appsLoaded = false
@@ -79,6 +106,25 @@ class MainActivity : Activity() {
     private var satsUsed = -1
     private var gpsListening = false
     private var netRegistered = false
+    private var online = false
+
+    /** 0 is home, 1 is the drive page. */
+    private var page = 0
+    private var downX = 0f
+    private var downY = 0f
+    private var swiping = false
+
+    private var lastLocation: Location? = null
+    /** Direction of travel in degrees, or null until the car has moved with a GPS fix. */
+    private var headingDeg: Float? = null
+
+    private var weather: WeatherReport? = null
+    private var weatherPlaceName = ""
+    private var weatherAt = 0L
+    private var weatherLat = 0.0
+    private var weatherLon = 0.0
+    private var weatherBusy = false
+    private var weatherTriedAt = 0L
 
     // ---------------------------------------------------------------- lifecycle
 
@@ -99,6 +145,33 @@ class MainActivity : Activity() {
         statusGps = findViewById(R.id.statusGps)
         statusNet = findViewById(R.id.statusNet)
         grid = findViewById(R.id.grid)
+
+        page2 = findViewById(R.id.page2)
+        dot0 = findViewById(R.id.dot0)
+        dot1 = findViewById(R.id.dot1)
+        compass = findViewById(R.id.compass)
+        coords = findViewById(R.id.coords)
+        altitude = findViewById(R.id.altitude)
+        map = findViewById(R.id.map)
+        weatherPlace = findViewById(R.id.weatherPlace)
+        weatherSymbol = findViewById(R.id.weatherSymbol)
+        weatherTemp = findViewById(R.id.weatherTemp)
+        weatherCond = findViewById(R.id.weatherCond)
+        weatherDetail = findViewById(R.id.weatherDetail)
+        weatherNote = findViewById(R.id.weatherNote)
+        forecast = findViewById(R.id.forecast)
+
+        compass.hint = getString(R.string.compass_hint)
+        map.waitingText = getString(R.string.map_wait_gps)
+        map.noDataText = getString(R.string.map_no_data)
+        map.zoom = prefs.getInt("map_zoom", TileMapView.DEFAULT_ZOOM)
+        map.setOnClickListener { openMap() }
+        findViewById<View>(R.id.zoomIn).setOnClickListener { zoomMap(1) }
+        findViewById<View>(R.id.zoomOut).setOnClickListener { zoomMap(-1) }
+        findViewById<View>(R.id.weatherCard).setOnClickListener { refreshWeather(true) }
+        findViewById<View>(R.id.pager).setOnClickListener { showPage(1 - page) }
+        loadSavedWeather()
+        showPage(0)
 
         val inflater = LayoutInflater.from(this)
         val row1 = findViewById<LinearLayout>(R.id.row1)
@@ -189,12 +262,68 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         showDrawer(false)
+        showPage(0)
     }
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
-        // A launcher has nowhere to go back to; Back only closes the drawer.
-        showDrawer(false)
+        // A launcher has nowhere to go back to; Back closes the drawer, then
+        // returns to the first page.
+        if (drawer.visibility == View.VISIBLE) showDrawer(false) else showPage(0)
+    }
+
+    /**
+     * A sideways swipe anywhere changes page. Once a drag is clearly horizontal
+     * the views underneath get a cancel, so the swipe doesn't also press a tile.
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (drawer.visibility == View.VISIBLE) return super.dispatchTouchEvent(event)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+                swiping = false
+            }
+            MotionEvent.ACTION_MOVE -> if (!swiping) {
+                val dx = abs(event.x - downX)
+                val dy = abs(event.y - downY)
+                if (dx > u * 5f && dx > dy * 1.5f) {
+                    swiping = true
+                    val cancel = MotionEvent.obtain(event)
+                    cancel.action = MotionEvent.ACTION_CANCEL
+                    super.dispatchTouchEvent(cancel)
+                    cancel.recycle()
+                }
+            }
+            MotionEvent.ACTION_UP -> if (swiping) {
+                swiping = false
+                val dx = event.x - downX
+                if (abs(dx) > u * 12f) showPage(if (dx < 0) 1 else 0)
+                return true
+            }
+            MotionEvent.ACTION_CANCEL -> swiping = false
+        }
+        return if (swiping) true else super.dispatchTouchEvent(event)
+    }
+
+    private fun showPage(index: Int) {
+        val changed = index != page
+        page = index
+        val shown = if (index == 0) home else page2
+        val hidden = if (index == 0) page2 else home
+        // INVISIBLE rather than GONE: the hidden page keeps its size, which
+        // applySizes() reads.
+        hidden.visibility = View.INVISIBLE
+        shown.visibility = View.VISIBLE
+        if (changed) {
+            shown.animate().cancel()
+            shown.alpha = 0f
+            shown.translationX = (if (index == 0) -1 else 1) * u * 8f
+            shown.animate().alpha(1f).translationX(0f).setDuration(160).start()
+        }
+        dot0.backgroundTintList = ColorStateList.valueOf(getColor(if (index == 0) R.color.accent else R.color.idle))
+        dot1.backgroundTintList = ColorStateList.valueOf(getColor(if (index == 1) R.color.accent else R.color.idle))
+        if (index == 1) refreshWeather(false)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -237,6 +366,27 @@ class MainActivity : Activity() {
             px(tile.findViewById(R.id.label), 4f)
         }
         gridAdapter.notifyDataSetChanged()
+
+        px(findViewById(R.id.compassTitle), 3.4f)
+        px(coords, 3.4f)
+        px(altitude, 3.4f)
+        px(weatherPlace, 3.4f)
+        px(weatherSymbol, 10f)
+        px(weatherTemp, 13f)
+        px(weatherCond, 4.4f)
+        px(weatherDetail, 3.4f)
+        px(weatherNote, 3f)
+        val zoomSize = (u * 10f).roundToInt()
+        for (id in intArrayOf(R.id.zoomIn, R.id.zoomOut)) {
+            val button = findViewById<TextView>(id)
+            val params = button.layoutParams
+            params.width = zoomSize
+            params.height = zoomSize
+            button.layoutParams = params
+            px(button, 6f)
+        }
+        // The forecast rows are built in code, so they need rebuilding at the new size.
+        renderWeather()
     }
 
     // ---------------------------------------------------------------- apps
@@ -460,6 +610,14 @@ class MainActivity : Activity() {
                 lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener)
                 lm.registerGnssStatusCallback(gnssCallback, ui)
                 gpsListening = true
+                // Until the first fix arrives, the last position the unit knew
+                // is enough to draw the map and fetch the weather.
+                if (lastLocation == null) {
+                    lm.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let {
+                        lastLocation = it
+                        updateDrive(it)
+                    }
+                }
             } catch (ex: Exception) {
                 // No GPS hardware or provider: the status line says "GPS off"
             }
@@ -488,7 +646,10 @@ class MainActivity : Activity() {
             speed.text = if (kmh < 3) "0" else kmh.toString()
             if (kmh >= 5 && location.hasBearing()) {
                 heading.text = COMPASS[(((location.bearing + 22.5f) / 45f).toInt()) % 8]
+                headingDeg = location.bearing
             }
+            lastLocation = location
+            updateDrive(location)
         }
 
         // These three are abstract on Android 10, so they must be overridden.
@@ -527,8 +688,188 @@ class MainActivity : Activity() {
             if (!gpsListening || SystemClock.elapsedRealtime() - lastFixAt > 5000) {
                 speed.text = "–"
                 heading.text = ""
+                headingDeg = null
+                compass.heading = null
             }
             ui.postDelayed(this, 2000)
+        }
+    }
+
+    // ---------------------------------------------------------------- drive page
+
+    /** Feeds a position to the compass, the coordinates, the map and the weather. */
+    private fun updateDrive(location: Location) {
+        compass.heading = headingDeg
+        coords.text = String.format(
+            Locale.US, "%.4f° %s   %.4f° %s",
+            abs(location.latitude), if (location.latitude >= 0) "N" else "S",
+            abs(location.longitude), if (location.longitude >= 0) "E" else "W"
+        )
+        altitude.text = if (location.hasAltitude()) getString(R.string.altitude, location.altitude.roundToInt()) else ""
+        map.setPosition(location.latitude, location.longitude, headingDeg)
+        refreshWeather(false)
+    }
+
+    private fun zoomMap(delta: Int) {
+        map.zoom = map.zoom + delta
+        prefs.edit().putInt("map_zoom", map.zoom).apply()
+    }
+
+    /** A tap on the map hands the position to a real map app. */
+    private fun openMap() {
+        val here = lastLocation ?: return
+        val uri = Uri.parse(String.format(Locale.US, "geo:%.5f,%.5f?z=%d", here.latitude, here.longitude, map.zoom))
+        open(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), getString(R.string.map_title))
+    }
+
+    // ---------------------------------------------------------------- weather
+
+    /** The forecast from the last run, so the page isn't empty while a new one loads. */
+    private fun loadSavedWeather() {
+        val savedAt = prefs.getLong("weather_at", 0L)
+        val age = System.currentTimeMillis() - savedAt
+        if (age < 0 || age > WEATHER_KEEP_MS) return
+        val report = Weather.parse(prefs.getString("weather_json", null) ?: return) ?: return
+        weather = report
+        weatherAt = savedAt
+        weatherLat = prefs.getFloat("weather_lat", 0f).toDouble()
+        weatherLon = prefs.getFloat("weather_lon", 0f).toDouble()
+        weatherPlaceName = prefs.getString("weather_place", "") ?: ""
+    }
+
+    /**
+     * Fetches a forecast when there is none, when it is over half an hour old,
+     * or when the car has moved a long way since. [force] skips those checks.
+     */
+    private fun refreshWeather(force: Boolean) {
+        val here = lastLocation
+        if (here == null || !online || weatherBusy) {
+            if (weather == null) renderWeather()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        if (!force) {
+            if (weatherTriedAt != 0L && now - weatherTriedAt < WEATHER_RETRY_MS) return
+            if (weather != null) {
+                val age = System.currentTimeMillis() - weatherAt
+                val moved = FloatArray(1)
+                Location.distanceBetween(weatherLat, weatherLon, here.latitude, here.longitude, moved)
+                if (age in 0L until WEATHER_MAX_AGE_MS && moved[0] < WEATHER_MOVE_M) return
+            }
+        }
+        weatherBusy = true
+        weatherTriedAt = now
+        if (weather == null) renderWeather()
+
+        val lat = here.latitude
+        val lon = here.longitude
+        Thread {
+            var json: String? = null
+            try {
+                json = Weather.download(lat, lon)
+            } catch (ex: Exception) {
+                // Keep showing the previous forecast
+            }
+            val report = json?.let { Weather.parse(it) }
+            val place = if (report != null) placeName(lat, lon) else null
+            runOnUiThread {
+                weatherBusy = false
+                if (report != null) {
+                    weather = report
+                    weatherAt = System.currentTimeMillis()
+                    weatherLat = lat
+                    weatherLon = lon
+                    weatherPlaceName = place ?: ""
+                    prefs.edit()
+                        .putString("weather_json", json)
+                        .putLong("weather_at", weatherAt)
+                        .putFloat("weather_lat", lat.toFloat())
+                        .putFloat("weather_lon", lon.toFloat())
+                        .putString("weather_place", weatherPlaceName)
+                        .apply()
+                }
+                renderWeather()
+            }
+        }.start()
+    }
+
+    /** The town for a position, if the unit has a geocoder. Blocks. */
+    private fun placeName(lat: Double, lon: Double): String? {
+        try {
+            if (!Geocoder.isPresent()) return null
+            @Suppress("DEPRECATION")
+            val found = Geocoder(this, Locale.getDefault()).getFromLocation(lat, lon, 1)
+            val first = found?.firstOrNull() ?: return null
+            return first.locality ?: first.subAdminArea ?: first.adminArea
+        } catch (ex: Exception) {
+            return null
+        }
+    }
+
+    private fun renderWeather() {
+        forecast.removeAllViews()
+        val report = weather
+        if (report == null) {
+            weatherPlace.setText(R.string.weather_title)
+            weatherSymbol.text = ""
+            weatherTemp.text = "–"
+            weatherCond.setText(
+                when {
+                    lastLocation == null -> R.string.weather_wait_gps
+                    !online -> R.string.weather_offline
+                    else -> R.string.weather_loading
+                }
+            )
+            weatherDetail.text = ""
+            weatherNote.text = ""
+            return
+        }
+
+        weatherPlace.text = weatherPlaceName.ifEmpty { getString(R.string.weather_title) }
+        weatherSymbol.text = Weather.symbol(report.code, report.isDay)
+        weatherTemp.text = "${report.temp}°"
+        weatherCond.setText(Weather.label(report.code))
+        val today = report.days.firstOrNull()
+        weatherDetail.text = getString(
+            R.string.weather_detail,
+            today?.max ?: report.temp, today?.min ?: report.temp,
+            report.feels, report.wind, report.humidity
+        )
+        weatherNote.text = getString(R.string.weather_updated, DateFormat.getTimeFormat(this).format(Date(weatherAt)))
+
+        // The next three days, one row each: day, pictogram, high / low.
+        val dayParser = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val dayName = SimpleDateFormat("EEE", Locale.getDefault())
+        for (day in report.days.drop(1).take(3)) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.gravity = Gravity.CENTER_VERTICAL
+            row.setPadding(0, (u * 0.9f).roundToInt(), 0, (u * 0.9f).roundToInt())
+
+            val name = TextView(this)
+            name.text = try {
+                dayName.format(dayParser.parse(day.date) ?: Date())
+            } catch (ex: Exception) {
+                day.date
+            }
+            name.setTextColor(getColor(R.color.text_dim))
+            px(name, 4f)
+            row.addView(name, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
+            val symbol = TextView(this)
+            symbol.text = Weather.symbol(day.code, true)
+            symbol.setTextColor(getColor(R.color.text))
+            px(symbol, 4f)
+            row.addView(symbol)
+
+            val range = TextView(this)
+            range.text = getString(R.string.weather_day_range, day.max, day.min)
+            range.setTextColor(getColor(R.color.text))
+            range.gravity = Gravity.END
+            px(range, 4f)
+            row.addView(range, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.4f))
+
+            forecast.addView(row)
         }
     }
 
@@ -558,6 +899,9 @@ class MainActivity : Activity() {
     }
 
     private fun setNet(state: Int) {
+        val wasOnline = online
+        online = state == NET_ONLINE
+        if (online && !wasOnline) refreshWeather(false)
         when (state) {
             NET_ONLINE -> setStatus(statusNet, getString(R.string.net_online), R.color.ok)
             NET_NO_INTERNET -> setStatus(statusNet, getString(R.string.net_no_internet), R.color.accent)
@@ -577,6 +921,11 @@ class MainActivity : Activity() {
         private const val NET_OFFLINE = 0
         private const val NET_NO_INTERNET = 1
         private const val NET_ONLINE = 2
+
+        private const val WEATHER_MAX_AGE_MS = 30L * 60 * 1000
+        private const val WEATHER_KEEP_MS = 3L * 60 * 60 * 1000
+        private const val WEATHER_RETRY_MS = 60_000L
+        private const val WEATHER_MOVE_M = 25_000f
 
         private val COMPASS = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
 

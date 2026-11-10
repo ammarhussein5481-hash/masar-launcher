@@ -149,6 +149,36 @@
         </LinearLayout>
     </LinearLayout>
 
+    <include layout="@layout/page_drive" />
+
+    <!-- Which page is showing. Swipe sideways, or tap here, to change it. -->
+    <LinearLayout
+        android:id="@+id/pager"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:clickable="true"
+        android:focusable="true"
+        android:orientation="horizontal"
+        android:paddingStart="24dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="5dp">
+
+        <View
+            android:id="@+id/dot0"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:layout_marginEnd="8dp"
+            android:background="@drawable/dot" />
+
+        <View
+            android:id="@+id/dot1"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/dot" />
+    </LinearLayout>
+
     <!-- All apps -->
     <LinearLayout
         android:id="@+id/drawer"

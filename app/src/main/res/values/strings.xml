@@ -22,4 +22,31 @@
     <string name="tile_n">Tile %1$d · %2$s</string>
     <string name="tile_empty">empty</string>
     <string name="cant_open">Can\'t open %1$s</string>
+
+    <string name="compass_title">Compass</string>
+    <string name="compass_hint">Drive to get a heading</string>
+    <string name="altitude">Altitude %1$d m</string>
+    <string name="map_title">Map</string>
+    <string name="map_wait_gps">Waiting for GPS</string>
+    <string name="map_no_data">Map needs internet</string>
+
+    <string name="weather_title">Weather</string>
+    <string name="weather_wait_gps">Waiting for GPS</string>
+    <string name="weather_offline">Weather needs internet</string>
+    <string name="weather_loading">Loading…</string>
+    <string name="weather_detail">High %1$d° · Low %2$d°\nFeels like %3$d°\nWind %4$d km/h\nHumidity %5$d%%</string>
+    <string name="weather_day_range">%1$d° / %2$d°</string>
+    <string name="weather_updated">Updated %1$s</string>
+    <string name="wx_clear">Clear</string>
+    <string name="wx_mostly_clear">Mostly clear</string>
+    <string name="wx_partly_cloudy">Partly cloudy</string>
+    <string name="wx_cloudy">Cloudy</string>
+    <string name="wx_fog">Fog</string>
+    <string name="wx_drizzle">Drizzle</string>
+    <string name="wx_rain">Rain</string>
+    <string name="wx_freezing_rain">Freezing rain</string>
+    <string name="wx_snow">Snow</string>
+    <string name="wx_showers">Showers</string>
+    <string name="wx_thunder">Thunderstorm</string>
+    <string name="wx_unknown">–</string>
 </resources>

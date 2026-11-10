@@ -9,7 +9,7 @@ A calm, glanceable home screen for Android car head units. *Masar* (مسار) me
 ## Why
 
 Most car launchers are either phone launchers stretched onto a dashboard or
-trial-ware with a paywall. Masar is one screen that does the few things a
+trial-ware with a paywall. Masar is two pages that do the few things a
 driver needs, with targets big enough to hit without looking twice.
 
 - **Eight large tiles.** Seven apps of your choice and an "All apps" tile.
@@ -17,8 +17,17 @@ driver needs, with targets big enough to hit without looking twice.
 - **Clock and date** that follow the system 12/24-hour setting.
 - **GPS speed and heading**, plus how many satellites are in use.
 - **Internet indicator**, so a dropped hotspot is obvious at a glance.
+- **A drive page** one swipe away, with three panels:
+  - **Compass** that turns with the direction of travel, plus coordinates and altitude.
+  - **Map** that follows the car. Roads already driven stay visible offline, and a tap opens your navigation app.
+  - **Weather** where you are: current conditions and the next three days.
 - **Scales itself.** Every size is a fraction of the screen height, so it looks the same on any resolution or density.
-- No ads, no trial, no account, and no network access of its own.
+- No ads, no trial, no account.
+
+The drive page is the only part that uses the internet: map tiles come from
+[OpenStreetMap](https://www.openstreetmap.org/copyright) and the forecast from
+[Open-Meteo](https://open-meteo.com/). Both receive the car's position, which is
+how they know what to send back. The home page works with no connection at all.
 
 ## Using it
 
@@ -29,6 +38,11 @@ driver needs, with targets big enough to hit without looking twice.
 | Tap **All apps** | Full app grid |
 | Long-press an app in the grid | Pin to a tile, app info, or uninstall |
 | Tap the speed area | Grants location access (needed once, for speed) |
+| Swipe sideways, or tap the dots at the bottom | Switches between home and the drive page |
+| Tap the map | Opens the position in your navigation app |
+| Tap **+** / **−** on the map | Zooms in or out |
+| Tap the weather | Refreshes it now |
+| Press Home or Back | Returns to the home page |
 
 ## Install
 
