@@ -3,7 +3,6 @@ name: Build APK
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -35,13 +34,9 @@ jobs:
             echo "No signing secret set: using the public sideload key in signing/."
           fi
 
+      # Every build on main is a release: 1.0.<run number>.
       - name: Version name
-        run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            echo "VERSION_NAME=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-          else
-            echo "VERSION_NAME=0.0.${GITHUB_RUN_NUMBER}-dev" >> "$GITHUB_ENV"
-          fi
+        run: echo "VERSION_NAME=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
 
       - name: Build
         env:
@@ -59,8 +54,11 @@ jobs:
           path: masar.apk
 
       - name: Publish release
-        if: github.ref_type == 'tag'
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ env.VERSION_NAME }}
+          name: Masar ${{ env.VERSION_NAME }}
+          target_commitish: ${{ github.sha }}
           files: masar.apk
           generate_release_notes: true

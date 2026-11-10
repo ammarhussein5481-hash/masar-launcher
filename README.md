@@ -56,8 +56,8 @@ Android 8.0 or newer. Built and tuned on a Rockchip RK3399 head unit running And
 ```
 
 The APK lands in `app/build/outputs/apk/release/`. There are no dependencies
-beyond the Android SDK and the Kotlin standard library. Pushing a `v*` tag makes
-GitHub Actions build a signed APK and attach it to a release.
+beyond the Android SDK and the Kotlin standard library. Every push to `main`
+makes GitHub Actions build a signed APK and publish it as a new release.
 
 ## Licence
 
