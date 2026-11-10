@@ -25,10 +25,13 @@
 
     <string name="handle_channel">Home handle</string>
     <string name="handle_running">Home handle is on</string>
-    <string name="handle_running_detail">Swipe up from the bottom edge to return to Masar</string>
-    <string name="handle_on">Home handle on. Swipe up from the bottom edge to return here.</string>
+    <string name="handle_running_detail">Touch the screen, then tap the white pill to return to Masar</string>
+    <string name="handle_on">Home handle on. In another app, touch the screen, then tap the white pill.</string>
     <string name="handle_off">Home handle off</string>
     <string name="handle_need_permission">Allow Masar to display over other apps to use the home handle</string>
+    <string name="handle_status_on">Home handle on</string>
+    <string name="handle_status_off">Home handle off</string>
+    <string name="handle_status_permission">Home handle · tap to allow</string>
 
     <string name="compass_title">Compass</string>
     <string name="compass_hint">Drive to get a heading</string>

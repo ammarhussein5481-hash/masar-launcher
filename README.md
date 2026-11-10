@@ -21,7 +21,7 @@ driver needs, with targets big enough to hit without looking twice.
   - **Compass** that turns with the direction of travel, plus coordinates and altitude.
   - **Map** that follows the car. Roads already driven stay visible offline, and a tap opens your navigation app.
   - **Weather** where you are: current conditions and the next three days.
-- **A home handle** over full-screen apps such as CarPlay: swipe up from the bottom edge to come back. See [Home handle](#home-handle).
+- **A home handle** over full-screen apps such as CarPlay: touch the screen, tap the pill, and you're back. See [Home handle](#home-handle).
 - **Scales itself.** Every size is a fraction of the screen height, so it looks the same on any resolution or density.
 - No ads, no trial, no account.
 
@@ -44,25 +44,27 @@ how they know what to send back. The home page works with no connection at all.
 | Tap **+** / **−** on the map | Zooms in or out |
 | Tap the weather | Refreshes it now |
 | Press Home or Back | Returns to the home page |
-| Long-press the dots at the bottom | Turns the home handle on or off |
-| Swipe up from the bottom edge, in another app | Returns to Masar (when the home handle is on) |
+| Long-press the dots at the bottom, or the handle's status line | Turns the home handle on or off |
+| Touch the screen in another app, then tap the white pill | Returns to Masar (when the home handle is on) |
 
 ## Home handle
 
 Full-screen apps such as CarPlay in the Carlinkit AutoKit app hide the
 system navigation bar, so there is no Home button to press. While Masar is
-not on screen it keeps a thin strip along the bottom edge of the screen, on
-top of every other app, with a short faint pill in the middle. **Swipe up**
-from it to bring Masar's home page back. A plain tap does nothing, so
-brushing the bottom edge never presses CarPlay's bottom row by accident.
-The pill stays invisible until you touch the screen: any touch, anywhere,
-fades it in for about three seconds, without getting in the way of that
-touch. The swipe works whether the pill is showing or not. The strip is 2%
-of the screen height tall and disappears whenever Masar itself is showing.
+not on screen, **touch the screen anywhere** and a white pill appears at the
+bottom centre for about three seconds. **Tap the pill**, or swipe up from
+it, and Masar's home page comes back.
 
-**Turning it off and on:** long-press the two page dots at the bottom of
-Masar. A message says which way it went, and the choice is remembered. It is
-on by default.
+The touch that reveals the pill still goes to the app underneath as normal.
+While the pill is hidden nothing of Masar's covers the screen, so it never
+swallows a tap meant for another app.
+
+**State:** the third status line on Masar's home page says whether the
+handle is on, off, or waiting for its permission. Tap that line to grant a
+missing permission.
+
+**Turning it off and on:** long-press that status line, or the two page
+dots at the bottom of Masar. The choice is remembered. It is on by default.
 
 It runs as a foreground service, so Android keeps it alive while Masar is in
 the background for a whole drive. A quiet "Home handle is on" notification is

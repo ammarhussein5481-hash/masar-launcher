@@ -29,31 +29,30 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 /**
- * The home handle: a thin strip along the bottom edge of the screen, drawn over
- * other apps, with a faint pill in the middle. Swiping up on it brings Masar back.
+ * The home handle: a way back to Masar from apps that hide the navigation bar,
+ * mainly CarPlay in the AutoKit app.
  *
- * The pill is invisible until the screen is touched: any touch, anywhere, fades
- * it in for a few seconds (the window watches outside touches without taking
- * them). The strip catches a swipe whether the pill is showing or not.
+ * Touch the screen anywhere and a white pill appears at the bottom centre for a
+ * few seconds. Tap it, or swipe up from it, and Masar comes to the front.
  *
- * It exists for full-screen apps that hide the navigation bar, mainly CarPlay in
- * the AutoKit app. A plain tap does nothing, so the strip can't press whatever
- * sits underneath it by accident.
+ * It is made of two overlay windows:
+ *  - a one-pixel "watcher" that hears every touch on the screen without taking
+ *    it (the system sends it an outside-touch notice), and
+ *  - the pill, which is only on screen for those few seconds. While it is gone
+ *    nothing of ours covers the app underneath, so no tap is ever swallowed.
  *
- * The strip is only on screen while Masar is not: [MainActivity] sets
- * [homeVisible] as it starts and stops. It runs as a foreground service so the
- * system keeps it alive while Masar sits in the background for a whole drive.
- * It needs the "display over other apps" permission; without it the service
- * stops itself.
+ * Both exist only while Masar is not in front: [MainActivity] sets
+ * [homeVisible] as it starts and stops. The service runs in the foreground so
+ * the system keeps it alive for a whole drive. It needs the "display over other
+ * apps" permission; without it the service stops itself.
  */
 class HandleService : Service() {
 
     private lateinit var wm: WindowManager
-    private var strip: FrameLayout? = null
-    private var shown = false
+    private var watcher: View? = null
     private var pill: View? = null
     private val ui = Handler(Looper.getMainLooper())
-    private val fadeOut = Runnable { pill?.animate()?.alpha(0f)?.setDuration(FADE_OUT_MS)?.start() }
+    private val hidePill = Runnable { removePill() }
 
     /** One percent of the screen height, in pixels. All sizes are multiples of it. */
     private var u = 7.2f
@@ -83,7 +82,8 @@ class HandleService : Service() {
 
     override fun onDestroy() {
         if (current === this) current = null
-        hide()
+        removePill()
+        removeWatcher()
         super.onDestroy()
     }
 
@@ -91,10 +91,8 @@ class HandleService : Service() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (shown) {
-            hide()
-            update()
-        }
+        // Sizes come from the screen; drop the pill so the next one is measured afresh.
+        removePill()
     }
 
     private fun goForeground() {
@@ -122,111 +120,160 @@ class HandleService : Service() {
         }
     }
 
-    // ---------------------------------------------------------------- the strip
+    // ---------------------------------------------------------------- windows
 
-    /** Puts the strip on screen or takes it off, to match whether Masar is in front. */
+    /** Listens for touches while another app is in front; stands down while Masar is. */
     private fun update() {
-        if (homeVisible || !allowed(this)) hide() else show()
+        if (homeVisible || !allowed(this)) {
+            removePill()
+            removeWatcher()
+        } else {
+            addWatcher()
+        }
     }
 
+    /** One pixel in the corner. It takes no touches of its own to speak of, but is told about all of them. */
     @SuppressLint("ClickableViewAccessibility")
-    private fun show() {
-        if (shown) return
-        val screen = screenSize()
-        u = screen.second / 100f
-
-        val pillView = View(this)
-        val shape = GradientDrawable()
-        shape.cornerRadius = u * PILL_THICK
-        shape.setColor(PILL_COLOR)
-        shape.setStroke(max(1, (u * 0.15f).roundToInt()), PILL_EDGE)
-        pillView.background = shape
-        pillView.alpha = 0f
-
-        val stripView = FrameLayout(this)
-        stripView.addView(
-            pillView,
-            FrameLayout.LayoutParams((u * PILL_LONG).roundToInt(), max(2, (u * PILL_THICK).roundToInt()), Gravity.CENTER)
-        )
-        stripView.setOnTouchListener { view, event -> onStripTouch(view, event) }
-
+    private fun addWatcher() {
+        if (watcher != null) return
+        val view = View(this)
+        view.setOnTouchListener { _, event ->
+            if (event.actionMasked == MotionEvent.ACTION_OUTSIDE || event.actionMasked == MotionEvent.ACTION_DOWN) {
+                reveal()
+            }
+            false
+        }
         val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            max(4, (u * STRIP_TALL).roundToInt()),
+            1, 1,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         )
-        params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        params.title = "Masar home handle"
-
+        params.gravity = Gravity.TOP or Gravity.START
+        params.title = "Masar touch watcher"
         try {
-            wm.addView(stripView, params)
-            strip = stripView
-            pill = pillView
-            shown = true
+            wm.addView(view, params)
+            watcher = view
         } catch (ex: Exception) {
-            // Permission revoked between the check and now: nothing to draw.
-            strip = null
-            shown = false
+            // Permission revoked between the check and now: nothing to add.
+            watcher = null
         }
     }
 
-    private fun hide() {
-        val view = strip
-        ui.removeCallbacks(fadeOut)
+    private fun removeWatcher() {
+        val view = watcher ?: return
+        watcher = null
+        try {
+            wm.removeView(view)
+        } catch (ex: Exception) {
+            // Already gone
+        }
+    }
+
+    /** Shows the pill, or keeps it up, for a few seconds after a touch. */
+    private fun reveal() {
+        ui.removeCallbacks(hidePill)
+        if (pill == null) addPill()
+        ui.postDelayed(hidePill, SHOW_MS)
+    }
+
+    /**
+     * The pill: white with a dark outline so it reads on light and dark screens
+     * alike, lifted a little off the bottom edge in case a bezel covers it. The
+     * window is larger than the pill itself, to give a finger something to hit.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun addPill() {
+        val screen = screenSize()
+        u = screen.second / 100f
+
+        val body = View(this)
+        val shape = GradientDrawable()
+        shape.cornerRadius = u * PILL_THICK
+        shape.setColor(PILL_COLOR)
+        shape.setStroke(max(2, (u * 0.4f).roundToInt()), PILL_EDGE)
+        body.background = shape
+
+        val target = FrameLayout(this)
+        target.addView(
+            body,
+            FrameLayout.LayoutParams(
+                (u * PILL_LONG).roundToInt(),
+                max(8, (u * PILL_THICK).roundToInt()),
+                Gravity.CENTER
+            )
+        )
+        target.alpha = 0f
+        target.setOnTouchListener { view, event -> onPillTouch(view, event) }
+
+        val params = WindowManager.LayoutParams(
+            (u * TARGET_WIDE).roundToInt(),
+            (u * TARGET_TALL).roundToInt(),
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        params.y = (u * LIFT).roundToInt()
+        params.title = "Masar home handle"
+
+        try {
+            wm.addView(target, params)
+            pill = target
+            target.animate().alpha(1f).setDuration(FADE_IN_MS).start()
+        } catch (ex: Exception) {
+            pill = null
+        }
+    }
+
+    private fun removePill() {
+        ui.removeCallbacks(hidePill)
+        val view = pill ?: return
         pill = null
-        strip = null
-        shown = false
-        if (view != null) {
-            try {
-                wm.removeView(view)
-            } catch (ex: Exception) {
-                // Already gone
-            }
+        try {
+            wm.removeView(view)
+        } catch (ex: Exception) {
+            // Already gone
         }
     }
 
     /**
-     * Swipe up: bring Masar to the front, once per gesture. The finger leaves the
-     * thin strip almost at once, but the window keeps getting the moves (above
-     * its top edge, y is negative). Anything else, a tap included, does nothing.
+     * A tap on the pill, or a swipe up from it, goes home. A sideways drag does
+     * nothing. Touching the pill also keeps it on screen.
      */
-    private fun onStripTouch(view: View, event: MotionEvent): Boolean {
+    private fun onPillTouch(view: View, event: MotionEvent): Boolean {
         when (event.actionMasked) {
-            // A touch somewhere else on the screen: only reveal the pill.
-            // The touch itself still goes to the app underneath.
-            MotionEvent.ACTION_OUTSIDE -> {
-                reveal()
-                return false
-            }
             MotionEvent.ACTION_DOWN -> {
-                reveal()
+                ui.removeCallbacks(hidePill)
                 downX = event.rawX
                 downY = event.rawY
                 fired = false
             }
             MotionEvent.ACTION_MOVE -> if (!fired) {
-                val dy = downY - event.rawY
-                val dx = abs(event.rawX - downX)
-                if (dy > u * SWIPE_UNITS && dy > dx) {
-                    fired = true
-                    view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                    goHome()
-                }
+                val up = downY - event.rawY
+                val sideways = abs(event.rawX - downX)
+                if (up > u * SWIPE_UNITS && up > sideways) fire(view)
             }
+            MotionEvent.ACTION_UP -> {
+                val moved = max(abs(event.rawX - downX), abs(event.rawY - downY))
+                if (!fired && moved < u * TAP_SLOP) fire(view)
+                if (!fired) ui.postDelayed(hidePill, SHOW_MS)
+            }
+            MotionEvent.ACTION_CANCEL -> ui.postDelayed(hidePill, SHOW_MS)
         }
         return true
     }
 
-    /** Fades the pill in, and out again a few seconds after the last touch. */
-    private fun reveal() {
-        val view = pill ?: return
-        ui.removeCallbacks(fadeOut)
-        if (view.alpha < 1f) view.animate().alpha(1f).setDuration(FADE_IN_MS).start()
-        ui.postDelayed(fadeOut, SHOW_MS)
+    private fun fire(view: View) {
+        fired = true
+        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+        goHome()
+        removePill()
     }
 
     private fun goHome() {
@@ -256,28 +303,32 @@ class HandleService : Service() {
         private const val CHANNEL = "handle"
         private const val NOTIFICATION_ID = 1
 
-        /** Touch strip height, pill thickness and pill length, in percent of screen height. */
-        private const val STRIP_TALL = 2f
-        private const val PILL_THICK = 0.7f
-        private const val PILL_LONG = 14f
+        /** Pill length and thickness, in percent of screen height. On 1200x720: 158 x 20 px. */
+        private const val PILL_LONG = 22f
+        private const val PILL_THICK = 2.8f
 
-        /** How far up, in percent of screen height, a swipe has to travel. */
-        private const val SWIPE_UNITS = 5f
+        /** The touchable window around the pill, and how far it sits above the bottom edge. */
+        private const val TARGET_WIDE = 30f
+        private const val TARGET_TALL = 9f
+        private const val LIFT = 1.5f
 
-        /** Faint white with a faint dark edge, so it shows on light and dark screens alike. */
-        private const val PILL_COLOR = 0x4DFFFFFF
-        private const val PILL_EDGE = 0x33000000
+        /** A swipe has to travel this far up; a tap may wander this far. Percent of screen height. */
+        private const val SWIPE_UNITS = 4f
+        private const val TAP_SLOP = 3f
 
-        /** How long the pill stays after the last touch, and its fade times. */
+        /** Nearly solid white with a dark edge, so it shows on any background. */
+        private const val PILL_COLOR = 0xF2FFFFFF.toInt()
+        private const val PILL_EDGE = 0xCC000000.toInt()
+
+        /** How long the pill stays after the last touch. */
         private const val SHOW_MS = 3000L
-        private const val FADE_IN_MS = 150L
-        private const val FADE_OUT_MS = 400L
+        private const val FADE_IN_MS = 120L
 
         const val PREF_ENABLED = "handle_on"
 
         private var current: HandleService? = null
 
-        /** True while Masar's own window is on screen; the strip hides then. */
+        /** True while Masar's own window is on screen; the handle stands down then. */
         var homeVisible = false
             set(value) {
                 field = value

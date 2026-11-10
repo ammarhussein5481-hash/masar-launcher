@@ -60,8 +60,9 @@ class AppEntry(val label: String, val component: ComponentName, val icon: Drawab
  * Page 2, drive: a compass, a small map that follows the car, and the weather.
  * Swipe sideways or tap the dots at the bottom to change page.
  *
- * Long-press the dots to turn the home handle ([HandleService]) on or off: a
- * strip over full-screen apps such as CarPlay that swipes back to this screen.
+ * Long-press the dots, or the handle's status line, to turn the home handle
+ * ([HandleService]) on or off: a pill over full-screen apps such as CarPlay
+ * that returns to this screen.
  *
  * Every size is derived from the screen height (see [applySizes]), so the layout
  * looks the same on any head unit resolution or density.
@@ -80,6 +81,7 @@ class MainActivity : Activity() {
     private lateinit var unit: TextView
     private lateinit var statusGps: TextView
     private lateinit var statusNet: TextView
+    private lateinit var statusHandle: TextView
     private lateinit var grid: GridView
 
     private lateinit var page2: View
@@ -147,6 +149,7 @@ class MainActivity : Activity() {
         unit = findViewById(R.id.unit)
         statusGps = findViewById(R.id.statusGps)
         statusNet = findViewById(R.id.statusNet)
+        statusHandle = findViewById(R.id.statusHandle)
         grid = findViewById(R.id.grid)
 
         page2 = findViewById(R.id.page2)
@@ -206,6 +209,14 @@ class MainActivity : Activity() {
         }
         speedBox.setOnClickListener(askForLocation)
         statusGps.setOnClickListener(askForLocation)
+        // The handle's line: a tap fixes a missing permission, a long-press is the on/off switch.
+        statusHandle.setOnClickListener {
+            if (HandleService.enabled(this) && !Settings.canDrawOverlays(this)) askForOverlay()
+        }
+        statusHandle.setOnLongClickListener {
+            toggleHandle()
+            true
+        }
 
         home.addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
             if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
@@ -247,6 +258,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         syncHandle()
+        updateHandleStatus()
     }
 
     override fun onStop() {
@@ -375,12 +387,24 @@ class MainActivity : Activity() {
     private fun toggleHandle() {
         val on = !HandleService.enabled(this)
         prefs.edit().putBoolean(HandleService.PREF_ENABLED, on).apply()
+        updateHandleStatus()
         if (on && !Settings.canDrawOverlays(this)) {
             askForOverlay()
             return
         }
         Toast.makeText(this, if (on) R.string.handle_on else R.string.handle_off, Toast.LENGTH_LONG).show()
         syncHandle()
+    }
+
+    /** The third status line: whether the home handle is on, off, or waiting for its permission. */
+    private fun updateHandleStatus() {
+        if (!HandleService.enabled(this)) {
+            setStatus(statusHandle, getString(R.string.handle_status_off), R.color.idle)
+        } else if (!Settings.canDrawOverlays(this)) {
+            setStatus(statusHandle, getString(R.string.handle_status_permission), R.color.accent)
+        } else {
+            setStatus(statusHandle, getString(R.string.handle_status_on), R.color.ok)
+        }
     }
 
     /** The system "Display over other apps" screen for Masar, or its app info if that is missing. */
@@ -410,6 +434,7 @@ class MainActivity : Activity() {
         px(unit, 3.8f)
         px(statusGps, 3.9f)
         px(statusNet, 3.9f)
+        px(statusHandle, 3.9f)
         px(findViewById(R.id.drawerTitle), 6f)
         px(findViewById(R.id.drawerClose), 4.2f)
 
