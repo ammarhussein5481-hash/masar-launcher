@@ -45,6 +45,9 @@ how they know what to send back. The home page works with no connection at all.
 | Tap the weather | Refreshes it now |
 | Press Home or Back | Returns to the home page |
 | Long-press the dots at the bottom, or the handle's status line | Steps the home handle through bar, pill and off |
+| Long-press the clock | Settings: home handle, speed alert, 8 or 12 tiles, accent colour, background photo, night dimming, prayer times, language |
+| Tap the prayer line | The day's prayer times |
+| Long-press the trip figures (drive page) | Reset the trip |
 | Touch the screen in any app | Shows the home bar (or pill) for a few seconds |
 
 ## Home handle
@@ -96,7 +99,7 @@ Undo it with `adb shell settings put global policy_control null`. With it
 on, a swipe up from the bottom edge still brings the real bar back briefly.
 
 The handle runs as a foreground service, so Android keeps it alive while
-Masar is in the background for a whole drive. A quiet "Home handle is on"
+Masar is in the background for a whole drive. A quiet "Masar is running"
 notification is the price of that. After a reboot it comes back as soon as
 Masar starts as the home app.
 
@@ -111,6 +114,33 @@ adb shell appops set cloud.ammarhussein.masar SYSTEM_ALERT_WINDOW allow
 
 Then press Home (or restart Masar). To take the permission away again, use
 `deny` instead of `allow`.
+
+## Settings
+
+Long-press the clock. Everything is off or neutral until you choose it.
+
+- **Now playing.** A strip under the tiles with the title, artist and
+  previous / play / next for whatever is playing on the unit. Android only
+  shows this to apps with *Notification access*; the menu line opens that
+  screen, or over adb:
+  `adb shell cmd notification allow_listener cloud.ammarhussein.masar/cloud.ammarhussein.masar.MediaService`.
+  Masar reads no notifications. Audio that an app plays without a media
+  session (some CarPlay dongle apps) does not show.
+- **Speed alert.** Pick a limit from 60 to 140 km/h. Crossing it beeps once
+  and the speed turns red; in other apps a red speed chip shows at the top
+  until the car slows down (needs "Display over other apps").
+- **Trip.** Distance, moving time, average and top speed on the drive page,
+  from GPS. A new trip starts by itself after the car has been parked for 30
+  minutes.
+- **Prayer times.** The next prayer and the time left, under the date. Worked
+  out on the unit from GPS with the Umm al-Qura method, no internet needed.
+  Expect a minute or two of difference from a local mosque.
+- **Night dimming.** A dark veil over Masar after sunset (or always, or
+  never). It dims Masar's own screens, not other apps.
+- **Tiles.** 8 in two rows or 12 in three.
+- **Accent colour** and **background photo.** The photo is copied into Masar
+  and darkened so the tiles stay readable.
+- **Language.** English or Arabic, independent of the unit's language.
 
 ## Install
 

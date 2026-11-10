@@ -32,6 +32,17 @@ class CompassView @JvmOverloads constructor(context: Context, attrs: AttributeSe
     /** Shown under the dash while there is no heading. */
     var hint: String = ""
 
+    /** The colour of north, the marker and the heading name. */
+    var accent: Int = context.getColor(R.color.accent)
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    // N, E, S, W and the eight points, in the app's language.
+    private val letters: Array<String> = context.resources.getStringArray(R.array.compass_4)
+    private val cardinals: Array<String> = context.resources.getStringArray(R.array.compass_8)
+
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         color = context.getColor(R.color.tile_stroke)
@@ -51,14 +62,12 @@ class CompassView @JvmOverloads constructor(context: Context, attrs: AttributeSe
     }
     private val marker = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
-        color = context.getColor(R.color.accent)
     }
     private val markerPath = Path()
 
     private val colorText = context.getColor(R.color.text)
     private val colorDim = context.getColor(R.color.text_dim)
     private val colorIdle = context.getColor(R.color.idle)
-    private val colorAccent = context.getColor(R.color.accent)
 
     override fun onDraw(canvas: Canvas) {
         val cx = width / 2f
@@ -89,11 +98,13 @@ class CompassView @JvmOverloads constructor(context: Context, attrs: AttributeSe
         // The letters ride the dial but stay upright.
         letter.textSize = r * 0.2f
         val letterShift = (letter.descent() + letter.ascent()) / 2f
-        for (i in LETTERS.indices) {
+        val colorAccent = accent
+        marker.color = colorAccent
+        for (i in letters.indices) {
             val angle = Math.toRadians((i * 90 + turn - 90f).toDouble())
             letter.color = if (i == 0) colorAccent else colorText
             canvas.drawText(
-                LETTERS[i],
+                letters[i],
                 cx + r * 0.7f * cos(angle).toFloat(),
                 cy + r * 0.7f * sin(angle).toFloat() - letterShift,
                 letter
@@ -120,18 +131,15 @@ class CompassView @JvmOverloads constructor(context: Context, attrs: AttributeSe
             val degrees = ((shown.roundToInt() % 360) + 360) % 360
             canvas.drawText("$degrees°", cx, cy + r * 0.1f, value)
             letter.color = colorAccent
-            canvas.drawText(cardinal(shown), cx, cy + r * 0.34f, letter)
+            canvas.drawText(cardinals[cardinalIndex(shown)], cx, cy + r * 0.34f, letter)
         }
     }
 
     companion object {
-        private val LETTERS = arrayOf("N", "E", "S", "W")
-        private val CARDINALS = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
-
-        /** "N", "NE", "E" … for a bearing in degrees. */
-        fun cardinal(bearing: Float): String {
+        /** 0 for north, 1 for north-east … 7 for north-west, for a bearing in degrees. */
+        fun cardinalIndex(bearing: Float): Int {
             val normal = ((bearing % 360f) + 360f) % 360f
-            return CARDINALS[((normal + 22.5f) / 45f).toInt() % 8]
+            return ((normal + 22.5f) / 45f).toInt() % 8
         }
     }
 }

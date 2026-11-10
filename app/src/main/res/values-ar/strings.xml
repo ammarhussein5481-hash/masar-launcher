@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">مسار</string>
+    <string name="all_apps">كل التطبيقات</string>
+    <string name="close">إغلاق</string>
+    <string name="carplay">كاربلاي</string>
+    <string name="add_app">أضف تطبيقاً</string>
+    <string name="unit_kmh">كم/س</string>
+    <string name="net_online">متصل</string>
+    <string name="net_no_internet">متصل، لا يوجد إنترنت</string>
+    <string name="net_offline">غير متصل</string>
+    <string name="gps_tap">المس لتشغيل السرعة</string>
+    <string name="gps_searching">جارٍ البحث عن GPS</string>
+    <string name="gps_off">GPS متوقف</string>
+    <string name="gps_sats">GPS · %1$d أقمار</string>
+    <string name="pick_title">اختر تطبيقاً لهذه الخانة</string>
+    <string name="pick_empty">اترك هذه الخانة فارغة</string>
+    <string name="menu_pin">ثبّت في خانة رئيسية</string>
+    <string name="menu_info">معلومات التطبيق</string>
+    <string name="menu_uninstall">إلغاء التثبيت</string>
+    <string name="pin_title">في أي خانة؟</string>
+    <string name="tile_n">الخانة %1$d · %2$s</string>
+    <string name="tile_empty">فارغة</string>
+    <string name="cant_open">تعذّر فتح %1$s</string>
+
+    <string name="handle_channel">زر الرئيسية</string>
+    <string name="handle_running">مسار يعمل</string>
+    <string name="handle_running_detail">شريط الرئيسية والرحلة وتنبيه السرعة</string>
+    <string name="handle_bar_on">شريط الرئيسية يعمل. المس الشاشة في أي تطبيق وسيظهر لبضع ثوانٍ.</string>
+    <string name="handle_pill_on">زر الرئيسية يعمل. في أي تطبيق آخر المس الشاشة ثم اضغط الزر الأبيض.</string>
+    <string name="handle_off">زر الرئيسية متوقف</string>
+    <string name="handle_need_permission">اسمح لمسار بالظهور فوق التطبيقات الأخرى لاستخدام زر الرئيسية</string>
+    <string name="handle_status_bar">شريط الرئيسية يعمل</string>
+    <string name="handle_status_pill">زر الرئيسية يعمل</string>
+    <string name="handle_status_off">زر الرئيسية متوقف</string>
+    <string name="handle_status_permission">زر الرئيسية · المس للسماح</string>
+    <string name="keys_label">أزرار الرجوع والتطبيقات الأخيرة في مسار</string>
+    <string name="keys_description">يتيح لشريط مسار الضغط على الرجوع والتطبيقات الأخيرة. لا يقرأ الشاشة ولا يجمع أي شيء.</string>
+    <string name="keys_needed">فعّل «أزرار الرجوع والتطبيقات الأخيرة في مسار» من إعدادات إمكانية الوصول لاستخدام هذا الزر</string>
+
+    <string name="compass_title">البوصلة</string>
+    <string name="compass_hint">تحرّك لمعرفة الاتجاه</string>
+    <string name="altitude">الارتفاع %1$d م</string>
+    <string name="map_title">الخريطة</string>
+    <string name="map_wait_gps">في انتظار GPS</string>
+    <string name="map_no_data">الخريطة تحتاج إلى الإنترنت</string>
+
+    <string name="weather_title">الطقس</string>
+    <string name="weather_wait_gps">في انتظار GPS</string>
+    <string name="weather_offline">الطقس يحتاج إلى الإنترنت</string>
+    <string name="weather_loading">جارٍ التحميل…</string>
+    <string name="weather_detail">العظمى %1$d° · الصغرى %2$d°\nالمحسوسة %3$d°\nالرياح %4$d كم/س\nالرطوبة %5$d%%</string>
+    <string name="weather_day_range">%1$d° / %2$d°</string>
+    <string name="weather_updated">آخر تحديث %1$s</string>
+    <string name="wx_clear">صافٍ</string>
+    <string name="wx_mostly_clear">صافٍ غالباً</string>
+    <string name="wx_partly_cloudy">غائم جزئياً</string>
+    <string name="wx_cloudy">غائم</string>
+    <string name="wx_fog">ضباب</string>
+    <string name="wx_drizzle">رذاذ</string>
+    <string name="wx_rain">مطر</string>
+    <string name="wx_freezing_rain">مطر متجمد</string>
+    <string name="wx_snow">ثلج</string>
+    <string name="wx_showers">زخات مطر</string>
+    <string name="wx_thunder">عاصفة رعدية</string>
+    <string name="wx_unknown">–</string>
+
+    <string-array name="compass_4">
+        <item>ش</item><item>ق</item><item>ج</item><item>غ</item>
+    </string-array>
+    <string-array name="compass_8">
+        <item>شمال</item><item>ش.ق</item><item>شرق</item><item>ج.ق</item><item>جنوب</item><item>ج.غ</item><item>غرب</item><item>ش.غ</item>
+    </string-array>
+
+    <string name="media_label">مسار: ما يُشغَّل الآن</string>
+    <string name="np_previous">السابق</string>
+    <string name="np_play_pause">تشغيل أو إيقاف مؤقت</string>
+    <string name="np_next">التالي</string>
+
+    <string name="speed_chip">%1$d كم/س</string>
+
+    <string-array name="prayers">
+        <item>الفجر</item><item>الظهر</item><item>العصر</item><item>المغرب</item><item>العشاء</item>
+    </string-array>
+    <string name="prayer_next">%1$s %2$s · بعد %3$s</string>
+    <string name="prayer_title">مواقيت الصلاة اليوم</string>
+    <string name="prayer_sunrise">الشروق</string>
+    <string name="prayer_note">تقويم أم القرى، محسوب من موقع GPS. قد يختلف المسجد القريب منك بدقيقة أو دقيقتين.</string>
+
+    <string name="trip_line">الرحلة %1$s كم · %2$s\nالمتوسط %3$d · الأقصى %4$d كم/س</string>
+    <string name="trip_reset">تصفير هذه الرحلة؟</string>
+
+    <string name="settings_title">إعدادات مسار</string>
+    <string name="set_handle">زر الرئيسية: %1$s</string>
+    <string name="mode_bar">شريط</string>
+    <string name="mode_pill">زر صغير</string>
+    <string name="mode_off">متوقف</string>
+    <string name="mode_on">يعمل</string>
+    <string name="set_speed">تنبيه السرعة: %1$s</string>
+    <string name="speed_value">%1$d كم/س</string>
+    <string name="set_rows">الخانات: %1$s</string>
+    <string name="rows_2">8 في صفين</string>
+    <string name="rows_3">12 في ثلاثة صفوف</string>
+    <string name="set_accent">لون التمييز</string>
+    <string-array name="accents">
+        <item>كهرماني</item><item>أزرق</item><item>أخضر</item><item>أحمر</item><item>بنفسجي</item><item>أبيض</item>
+    </string-array>
+    <string name="set_photo">صورة الخلفية: %1$s</string>
+    <string name="photo_none">لا توجد</string>
+    <string name="photo_set">محددة</string>
+    <string name="photo_choose">اختر صورة</string>
+    <string name="photo_remove">أزل الصورة</string>
+    <string name="photo_failed">تعذّر فتح هذه الصورة</string>
+    <string name="set_night">التعتيم الليلي: %1$s</string>
+    <string name="night_auto">بعد الغروب</string>
+    <string name="night_always">دائماً</string>
+    <string name="set_prayer">مواقيت الصلاة: %1$s</string>
+    <string name="set_lang">اللغة: %1$s</string>
+    <string name="lang_system">مثل لغة الجهاز</string>
+    <string name="set_media">ما يُشغَّل الآن: %1$s</string>
+    <string name="media_need">يحتاج إلى إذن الإشعارات</string>
+    <string name="media_hint">فعّل مسار في «الوصول إلى الإشعارات» لعرض ما يُشغَّل</string>
+    <string name="set_keys">زرا الرجوع والتطبيقات الأخيرة: %1$s</string>
+    <string name="keys_need">يحتاج إلى تفعيل إمكانية الوصول</string>
+</resources>

@@ -4,7 +4,24 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
-    android:fitsSystemWindows="true">
+    android:fitsSystemWindows="true"
+    android:layoutDirection="ltr">
+
+    <!-- Optional background photo, darkened so the tiles and text stay readable -->
+    <ImageView
+        android:id="@+id/wallpaper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:importantForAccessibility="no"
+        android:scaleType="centerCrop"
+        android:visibility="gone" />
+
+    <View
+        android:id="@+id/wallpaperShade"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#B30A0C0F"
+        android:visibility="gone" />
 
     <!-- Home: clock and drive info on the left, eight tiles on the right -->
     <LinearLayout
@@ -45,6 +62,16 @@
                 android:format24Hour="EEEE, d MMMM"
                 android:maxLines="1"
                 android:textColor="@color/text_dim" />
+
+            <!-- Next prayer and how long until it. Tap for the day's times. -->
+            <TextView
+                android:id="@+id/prayer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:paddingTop="2dp"
+                android:textColor="@color/accent"
+                android:visibility="gone" />
 
             <View
                 android:layout_width="match_parent"
@@ -159,6 +186,89 @@
                 android:layout_weight="1"
                 android:baselineAligned="false"
                 android:orientation="horizontal" />
+
+            <LinearLayout
+                android:id="@+id/row3"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:baselineAligned="false"
+                android:orientation="horizontal"
+                android:visibility="gone" />
+
+            <!-- Now playing: shown only while something on the unit has a media session -->
+            <LinearLayout
+                android:id="@+id/nowPlaying"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="6dp"
+                android:background="@drawable/tile_bg"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="6dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:id="@+id/npArt"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:importantForAccessibility="no"
+                    android:scaleType="centerCrop" />
+
+                <LinearLayout
+                    android:id="@+id/npText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/npTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:fontFamily="sans-serif-medium"
+                        android:maxLines="1"
+                        android:textColor="@color/text" />
+
+                    <TextView
+                        android:id="@+id/npArtist"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/text_dim" />
+                </LinearLayout>
+
+                <ImageView
+                    android:id="@+id/npPrev"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bar_button"
+                    android:contentDescription="@string/np_previous"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_np_prev" />
+
+                <ImageView
+                    android:id="@+id/npPlay"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bar_button"
+                    android:contentDescription="@string/np_play_pause"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_np_play" />
+
+                <ImageView
+                    android:id="@+id/npNext"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/bar_button"
+                    android:contentDescription="@string/np_next"
+                    android:scaleType="fitCenter"
+                    android:src="@drawable/ic_np_next" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
@@ -248,4 +358,14 @@
             android:stretchMode="columnWidth"
             android:verticalSpacing="10dp" />
     </LinearLayout>
+
+    <!-- Night dimming: a dark veil over everything. It takes no touches. -->
+    <View
+        android:id="@+id/nightScrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:background="#000000"
+        android:clickable="false"
+        android:focusable="false" />
 </FrameLayout>

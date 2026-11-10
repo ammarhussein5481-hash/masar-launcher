@@ -12,12 +12,18 @@ import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.drawable.Drawable
 import android.location.Geocoder
 import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.MediaMetadata
+import android.media.session.MediaController
+import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -40,10 +46,15 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -53,16 +64,16 @@ class AppEntry(val label: String, val component: ComponentName, val icon: Drawab
 /**
  * The whole launcher is this one activity, with two pages side by side.
  *
- * Page 1, home. Left: clock, date, GPS speed and heading, and two status lines
- * (GPS, internet). Right: eight large tiles. The first seven hold apps, the last
- * opens "All apps".
+ * Page 1, home. Left: clock, date, next prayer, GPS speed and heading, and
+ * three status lines. Right: eight or twelve large tiles, the last of which
+ * opens "All apps", and under them a strip for whatever is playing.
  *
- * Page 2, drive: a compass, a small map that follows the car, and the weather.
- * Swipe sideways or tap the dots at the bottom to change page.
+ * Page 2, drive: a compass with the trip under it, a small map that follows
+ * the car, and the weather. Swipe sideways or tap the dots to change page.
  *
- * Long-press the dots, or the handle's status line, to step the home handle
- * ([HandleService]) through bar, pill and off: buttons that appear over any
- * app when the screen is touched, for Home, Back and the volume.
+ * Long-press the clock for the settings menu: home handle, speed alert, tile
+ * count, accent colour, background photo, night dimming, prayer times and
+ * language. The choices themselves live in [Options].
  *
  * Every size is derived from the screen height (see [applySizes]), so the layout
  * looks the same on any head unit resolution or density.
@@ -98,6 +109,28 @@ class MainActivity : Activity() {
     private lateinit var weatherDetail: TextView
     private lateinit var weatherNote: TextView
     private lateinit var forecast: LinearLayout
+    private lateinit var trip: TextView
+    private lateinit var prayer: TextView
+    private lateinit var nightScrim: View
+    private lateinit var wallpaper: ImageView
+    private lateinit var wallpaperShade: View
+    private lateinit var nowPlaying: View
+    private lateinit var npArt: ImageView
+    private lateinit var npTitle: TextView
+    private lateinit var npArtist: TextView
+    private lateinit var npPlay: ImageView
+
+    /** Tiles on the home page: 8 or 12. The last one is always "All apps". */
+    private var slots = 8
+    private var accent = 0
+    private lateinit var compass8: Array<String>
+
+    private var controller: MediaController? = null
+    private var mediaListening = false
+
+    private var prayerDay: PrayerTimes.Day? = null
+    private var prayerKey = ""
+    private var positionSavedAt = 0L
 
     private val tiles = ArrayList<View>()
     private var apps: List<AppEntry> = emptyList()
@@ -133,10 +166,18 @@ class MainActivity : Activity() {
 
     // ---------------------------------------------------------------- lifecycle
 
+    /** Everything is drawn in the language chosen in the settings menu. */
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(Options.localized(newBase))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        prefs = getSharedPreferences("masar", Context.MODE_PRIVATE)
+        prefs = Options.prefs(this)
+        accent = Options.accent(prefs)
+        compass8 = resources.getStringArray(R.array.compass_8)
+        Trip.load(prefs)
 
         home = findViewById(R.id.home)
         panel = findViewById(R.id.panel)
@@ -166,6 +207,44 @@ class MainActivity : Activity() {
         weatherDetail = findViewById(R.id.weatherDetail)
         weatherNote = findViewById(R.id.weatherNote)
         forecast = findViewById(R.id.forecast)
+        trip = findViewById(R.id.trip)
+        prayer = findViewById(R.id.prayer)
+        nightScrim = findViewById(R.id.nightScrim)
+        wallpaper = findViewById(R.id.wallpaper)
+        wallpaperShade = findViewById(R.id.wallpaperShade)
+        nowPlaying = findViewById(R.id.nowPlaying)
+        npArt = findViewById(R.id.npArt)
+        npTitle = findViewById(R.id.npTitle)
+        npArtist = findViewById(R.id.npArtist)
+        npPlay = findViewById(R.id.npPlay)
+
+        clock.setOnLongClickListener {
+            settingsMenu()
+            true
+        }
+        prayer.setOnClickListener { prayerDialog() }
+        trip.setOnLongClickListener {
+            AlertDialog.Builder(this)
+                .setMessage(R.string.trip_reset)
+                .setPositiveButton(android.R.string.ok) { _, _ ->
+                    Trip.reset(prefs)
+                    renderTrip()
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            true
+        }
+        findViewById<View>(R.id.npPrev).setOnClickListener { controller?.transportControls?.skipToPrevious() }
+        findViewById<View>(R.id.npNext).setOnClickListener { controller?.transportControls?.skipToNext() }
+        npPlay.setOnClickListener {
+            val active = controller ?: return@setOnClickListener
+            if (active.playbackState?.state == PlaybackState.STATE_PLAYING) {
+                active.transportControls.pause()
+            } else {
+                active.transportControls.play()
+            }
+        }
+        findViewById<View>(R.id.npText).setOnClickListener { openPlayer() }
 
         compass.hint = getString(R.string.compass_hint)
         map.waitingText = getString(R.string.map_wait_gps)
@@ -183,16 +262,9 @@ class MainActivity : Activity() {
         }
         loadSavedWeather()
         showPage(0)
-
-        val inflater = LayoutInflater.from(this)
-        val row1 = findViewById<LinearLayout>(R.id.row1)
-        val row2 = findViewById<LinearLayout>(R.id.row2)
-        for (i in 0 until SLOTS) {
-            val row = if (i < SLOTS / 2) row1 else row2
-            val tile = inflater.inflate(R.layout.tile, row, false)
-            row.addView(tile)
-            tiles.add(tile)
-        }
+        applyAccent()
+        loadWallpaper()
+        buildTiles()
 
         grid.adapter = gridAdapter
         grid.setOnItemClickListener { _, _, position, _ -> launch(apps[position]) }
@@ -250,8 +322,9 @@ class MainActivity : Activity() {
                 // Leave the indicator on "Offline"
             }
         }
+        startMedia()
         ui.removeCallbacks(staleCheck)
-        ui.postDelayed(staleCheck, 2000)
+        ui.post(staleCheck)
     }
 
     /** Also runs on Home while already in front, so a permission granted over adb takes effect then. */
@@ -265,6 +338,7 @@ class MainActivity : Activity() {
         super.onStop()
         HandleService.homeVisible = false
         stopGps()
+        stopMedia()
         if (netRegistered) {
             try {
                 val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -349,8 +423,9 @@ class MainActivity : Activity() {
             shown.translationX = (if (index == 0) -1 else 1) * u * 8f
             shown.animate().alpha(1f).translationX(0f).setDuration(160).start()
         }
-        dot0.backgroundTintList = ColorStateList.valueOf(getColor(if (index == 0) R.color.accent else R.color.idle))
-        dot1.backgroundTintList = ColorStateList.valueOf(getColor(if (index == 1) R.color.accent else R.color.idle))
+        val idle = getColor(R.color.idle)
+        dot0.backgroundTintList = ColorStateList.valueOf(if (index == 0) accent else idle)
+        dot1.backgroundTintList = ColorStateList.valueOf(if (index == 1) accent else idle)
         if (index == 1) refreshWeather(false)
     }
 
@@ -362,23 +437,21 @@ class MainActivity : Activity() {
     // ---------------------------------------------------------------- home handle
 
     /**
-     * Starts or stops the home handle service to match the saved setting. If the
-     * overlay permission is missing, opens the system screen for it, but only
-     * once by itself; after that only when the handle is turned on by hand.
+     * Starts Masar's service, or tells the running one that a setting changed.
+     * It always runs: besides the home handle it keeps the trip and the speed
+     * alert. If the handle is on but the overlay permission is missing, opens
+     * the system screen for it, but only once by itself; after that only when
+     * the handle is turned on by hand.
      */
     private fun syncHandle() {
-        val service = Intent(this, HandleService::class.java)
-        if (!HandleService.enabled(this)) {
-            stopService(service)
-            return
+        try {
+            startForegroundService(Intent(this, HandleService::class.java))
+        } catch (ex: Exception) {
+            // The system refused; the floating dot in AutoKit still works.
         }
-        if (Settings.canDrawOverlays(this)) {
-            try {
-                startForegroundService(service)
-            } catch (ex: Exception) {
-                // The system refused; the floating dot in AutoKit still works.
-            }
-        } else if (!prefs.getBoolean(PREF_HANDLE_ASKED, false)) {
+        if (HandleService.enabled(this) && !Settings.canDrawOverlays(this) &&
+            !prefs.getBoolean(PREF_HANDLE_ASKED, false)
+        ) {
             prefs.edit().putBoolean(PREF_HANDLE_ASKED, true).apply()
             askForOverlay()
         }
@@ -386,11 +459,16 @@ class MainActivity : Activity() {
 
     /** Steps the home handle through its looks: bar, pill, off, and round again. */
     private fun toggleHandle() {
-        val next = when (HandleService.mode(this)) {
-            HandleService.MODE_BAR -> HandleService.MODE_PILL
-            HandleService.MODE_PILL -> HandleService.MODE_OFF
-            else -> HandleService.MODE_BAR
-        }
+        setHandleMode(
+            when (HandleService.mode(this)) {
+                HandleService.MODE_BAR -> HandleService.MODE_PILL
+                HandleService.MODE_PILL -> HandleService.MODE_OFF
+                else -> HandleService.MODE_BAR
+            }
+        )
+    }
+
+    private fun setHandleMode(next: String) {
         prefs.edit().putString(HandleService.PREF_MODE, next).apply()
         updateHandleStatus()
         if (next != HandleService.MODE_OFF && !Settings.canDrawOverlays(this)) {
@@ -430,10 +508,435 @@ class MainActivity : Activity() {
         }
     }
 
+    // ---------------------------------------------------------------- look
+
+    /** Paints everything that carries the accent colour. */
+    private fun applyAccent() {
+        accent = Options.accent(prefs)
+        heading.setTextColor(accent)
+        prayer.setTextColor(accent)
+        compass.accent = accent
+        map.accent = accent
+        showPage(page)
+    }
+
+    private fun wallpaperFile(): File = File(filesDir, WALLPAPER_FILE)
+
+    /** Shows the background photo, if one was chosen, under a dark shade. */
+    private fun loadWallpaper() {
+        var bitmap: Bitmap? = null
+        try {
+            if (wallpaperFile().exists()) bitmap = BitmapFactory.decodeFile(wallpaperFile().path)
+        } catch (ex: Throwable) {
+            // Unreadable or too large: carry on with the plain background
+        }
+        wallpaper.setImageBitmap(bitmap)
+        wallpaper.visibility = if (bitmap != null) View.VISIBLE else View.GONE
+        wallpaperShade.visibility = wallpaper.visibility
+    }
+
+    private fun choosePhoto() {
+        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("image/*")
+        try {
+            startActivityForResult(pick, REQUEST_PHOTO)
+        } catch (ex: Exception) {
+            try {
+                startActivityForResult(Intent(Intent.ACTION_GET_CONTENT).setType("image/*"), REQUEST_PHOTO)
+            } catch (ex2: Exception) {
+                Toast.makeText(this, R.string.photo_failed, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (requestCode != REQUEST_PHOTO || resultCode != RESULT_OK || uri == null) return
+        // Copy a screen-sized version into Masar's own storage, so the photo
+        // stays even if the original is moved or the USB stick is pulled out.
+        Thread {
+            var saved = false
+            try {
+                val bounds = BitmapFactory.Options()
+                bounds.inJustDecodeBounds = true
+                contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                val options = BitmapFactory.Options()
+                options.inSampleSize = 1
+                while (max(bounds.outWidth, bounds.outHeight) / options.inSampleSize > 2600) options.inSampleSize *= 2
+                val bitmap = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+                if (bitmap != null) {
+                    FileOutputStream(wallpaperFile()).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
+                    saved = true
+                }
+            } catch (ex: Throwable) {
+                // Reported below
+            }
+            runOnUiThread {
+                if (saved) loadWallpaper() else Toast.makeText(this, R.string.photo_failed, Toast.LENGTH_LONG).show()
+            }
+        }.start()
+    }
+
+    /** Sunrise, sunset and the prayers for today at the car's position, or null if no position is known yet. */
+    private fun today(): PrayerTimes.Day? {
+        val lat: Double
+        val lon: Double
+        val here = lastLocation
+        if (here != null) {
+            lat = here.latitude
+            lon = here.longitude
+        } else {
+            val saved = Options.savedPosition(prefs) ?: return null
+            lat = saved[0]
+            lon = saved[1]
+        }
+        val now = Calendar.getInstance()
+        // Worked out again only on a new day or after a real change of place.
+        val key = String.format(
+            Locale.US, "%d-%d %.1f %.1f",
+            now.get(Calendar.YEAR), now.get(Calendar.DAY_OF_YEAR), lat, lon
+        )
+        if (key != prayerKey || prayerDay == null) {
+            prayerDay = try {
+                PrayerTimes.forDay(now, lat, lon, TimeZone.getDefault())
+            } catch (ex: Exception) {
+                null
+            }
+            prayerKey = key
+        }
+        return prayerDay
+    }
+
+    private fun hoursNow(): Double {
+        val now = Calendar.getInstance()
+        return now.get(Calendar.HOUR_OF_DAY) + now.get(Calendar.MINUTE) / 60.0 + now.get(Calendar.SECOND) / 3600.0
+    }
+
+    /** A veil over the screen at night, so the unit doesn't glare. */
+    private fun renderNight() {
+        val dark = when (Options.night(prefs)) {
+            Options.NIGHT_ALWAYS -> true
+            Options.NIGHT_OFF -> false
+            else -> {
+                val day = today()
+                val hours = hoursNow()
+                // With no position yet, assume a plain 6-to-6 day.
+                val sunrise = day?.sunrise ?: 6.0
+                val sunset = day?.maghrib ?: 18.0
+                hours < sunrise || hours >= sunset
+            }
+        }
+        val target = if (dark) NIGHT_ALPHA else 0f
+        if (nightScrim.alpha != target) nightScrim.alpha = target
+    }
+
+    // ---------------------------------------------------------------- prayer times
+
+    /** "5:08 PM" for a number of hours after today's midnight. */
+    private fun clockTime(hours: Double): String {
+        val at = Calendar.getInstance()
+        at.set(Calendar.HOUR_OF_DAY, 0)
+        at.set(Calendar.MINUTE, 0)
+        at.set(Calendar.SECOND, 0)
+        at.set(Calendar.MILLISECOND, 0)
+        at.add(Calendar.MINUTE, (hours * 60.0).roundToInt())
+        return DateFormat.getTimeFormat(this).format(at.time)
+    }
+
+    /** The line under the date: the next prayer, its time, and how long until it. */
+    private fun renderPrayer() {
+        val day = if (Options.prayerOn(prefs)) today() else null
+        if (day == null) {
+            prayer.visibility = View.GONE
+            return
+        }
+        val names = resources.getStringArray(R.array.prayers)
+        val times = day.prayers()
+        val now = hoursNow()
+        var index = times.indexOfFirst { it > now }
+        // After Isha the next one is tomorrow's Fajr, near enough today's time plus a day.
+        val at = if (index < 0) times[PrayerTimes.FAJR] + 24.0 else times[index]
+        if (index < 0) index = PrayerTimes.FAJR
+        val minutes = max(0, ((at - now) * 60.0).roundToInt())
+        val left = String.format(Locale.US, "%d:%02d", minutes / 60, minutes % 60)
+        prayer.text = getString(R.string.prayer_next, names[index], clockTime(at), left)
+        prayer.visibility = View.VISIBLE
+    }
+
+    private fun prayerDialog() {
+        val day = today() ?: return
+        val names = resources.getStringArray(R.array.prayers)
+        val text = StringBuilder()
+        fun line(name: String, hours: Double) {
+            text.append(name).append("   ").append(clockTime(hours)).append('\n')
+        }
+        line(names[PrayerTimes.FAJR], day.fajr)
+        line(getString(R.string.prayer_sunrise), day.sunrise)
+        line(names[PrayerTimes.DHUHR], day.dhuhr)
+        line(names[PrayerTimes.ASR], day.asr)
+        line(names[PrayerTimes.MAGHRIB], day.maghrib)
+        line(names[PrayerTimes.ISHA], day.isha)
+        text.append('\n').append(getString(R.string.prayer_note))
+        AlertDialog.Builder(this)
+            .setTitle(R.string.prayer_title)
+            .setMessage(text)
+            .setPositiveButton(R.string.close, null)
+            .show()
+    }
+
+    // ---------------------------------------------------------------- trip
+
+    private fun renderTrip() {
+        val minutes = (Trip.movingMs / 60_000L).toInt()
+        trip.text = getString(
+            R.string.trip_line,
+            String.format(Locale.US, "%.1f", Trip.meters / 1000.0),
+            String.format(Locale.US, "%d:%02d", minutes / 60, minutes % 60),
+            Trip.averageKmh(), Trip.topKmh
+        )
+    }
+
+    // ---------------------------------------------------------------- now playing
+
+    private fun hasMediaAccess(): Boolean {
+        val enabled = Settings.Secure.getString(contentResolver, "enabled_notification_listeners") ?: ""
+        return enabled.contains("$packageName/")
+    }
+
+    private val sessionsListener = MediaSessionManager.OnActiveSessionsChangedListener { list -> pickSession(list) }
+
+    private val mediaCallback = object : MediaController.Callback() {
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            renderMedia()
+        }
+
+        override fun onMetadataChanged(metadata: MediaMetadata?) {
+            renderMedia()
+        }
+
+        override fun onSessionDestroyed() {
+            pickSession(null)
+        }
+    }
+
+    /** Listens for media sessions. Without notification access the strip simply stays hidden. */
+    private fun startMedia() {
+        if (mediaListening) return
+        try {
+            val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val who = ComponentName(this, MediaService::class.java)
+            manager.addOnActiveSessionsChangedListener(sessionsListener, who)
+            mediaListening = true
+            pickSession(manager.getActiveSessions(who))
+        } catch (ex: Exception) {
+            pickSession(null)
+        }
+    }
+
+    private fun stopMedia() {
+        if (mediaListening) {
+            try {
+                val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+                manager.removeOnActiveSessionsChangedListener(sessionsListener)
+            } catch (ex: Exception) {
+                // Already removed
+            }
+            mediaListening = false
+        }
+        pickSession(null)
+    }
+
+    /** Follows the session that is playing, or failing that the most recent one. */
+    private fun pickSession(list: List<MediaController>?) {
+        val next = list?.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: list?.firstOrNull()
+        val old = controller
+        if (old?.sessionToken != next?.sessionToken || next == null) {
+            try {
+                old?.unregisterCallback(mediaCallback)
+            } catch (ex: Exception) {
+                // The session is already gone
+            }
+            controller = next
+            try {
+                next?.registerCallback(mediaCallback, ui)
+            } catch (ex: Exception) {
+                controller = null
+            }
+        }
+        renderMedia()
+    }
+
+    private fun renderMedia() {
+        val active = controller
+        val data = try {
+            active?.metadata
+        } catch (ex: Exception) {
+            null
+        }
+        val title = data?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
+            ?: data?.getString(MediaMetadata.METADATA_KEY_TITLE)
+        if (active == null || title.isNullOrBlank()) {
+            nowPlaying.visibility = View.GONE
+            return
+        }
+        npTitle.text = title
+        val artist = data?.getString(MediaMetadata.METADATA_KEY_ARTIST)
+            ?: data?.getString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE)
+            ?: ""
+        npArtist.text = artist
+        npArtist.visibility = if (artist.isBlank()) View.GONE else View.VISIBLE
+        val art = data?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+            ?: data?.getBitmap(MediaMetadata.METADATA_KEY_ART)
+            ?: data?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        if (art != null) {
+            npArt.setImageBitmap(art)
+        } else {
+            // No cover: the player's own icon stands in.
+            npArt.setImageDrawable(apps.firstOrNull { it.component.packageName == active.packageName }?.icon)
+        }
+        val playing = active.playbackState?.state == PlaybackState.STATE_PLAYING
+        npPlay.setImageResource(if (playing) R.drawable.ic_np_pause else R.drawable.ic_np_play)
+        nowPlaying.visibility = View.VISIBLE
+    }
+
+    /** A tap on the title opens the player itself. */
+    private fun openPlayer() {
+        val active = controller ?: return
+        try {
+            val session = active.sessionActivity
+            if (session != null) {
+                session.send()
+                return
+            }
+        } catch (ex: Exception) {
+            // Fall through to the app's own launcher entry
+        }
+        val launcher = packageManager.getLaunchIntentForPackage(active.packageName) ?: return
+        open(launcher, active.packageName)
+    }
+
+    // ---------------------------------------------------------------- settings
+
+    /** A list to pick one of; [current] is ticked. */
+    private fun choose(title: Int, labels: Array<String>, current: Int, onPick: (Int) -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                dialog.dismiss()
+                onPick(which)
+            }
+            .show()
+    }
+
+    private fun onOff(on: Boolean): String = getString(if (on) R.string.mode_on else R.string.mode_off)
+
+    /** Long-press on the clock. Each line shows its current value. */
+    private fun settingsMenu() {
+        val modes = arrayOf(HandleService.MODE_BAR, HandleService.MODE_PILL, HandleService.MODE_OFF)
+        val modeNames = arrayOf(getString(R.string.mode_bar), getString(R.string.mode_pill), getString(R.string.mode_off))
+        val mode = max(0, modes.indexOf(HandleService.mode(this)))
+
+        val limits = Options.SPEED_LIMITS
+        val limitNames = Array(limits.size) {
+            if (limits[it] == 0) getString(R.string.mode_off) else getString(R.string.speed_value, limits[it])
+        }
+        val limit = max(0, limits.indexOf(Options.speedLimit(prefs)))
+
+        val rowNames = arrayOf(getString(R.string.rows_2), getString(R.string.rows_3))
+        val rows = Options.rows(prefs) - 2
+
+        val nightNames = arrayOf(getString(R.string.night_auto), getString(R.string.night_always), getString(R.string.mode_off))
+        val night = Options.night(prefs)
+
+        val langs = arrayOf("", "en", "ar")
+        val langNames = arrayOf(getString(R.string.lang_system), "English", "العربية")
+        val lang = max(0, langs.indexOf(Options.language(prefs)))
+
+        val accentNames = resources.getStringArray(R.array.accents)
+        val hasPhoto = wallpaperFile().exists()
+        val prayerOn = Options.prayerOn(prefs)
+
+        val items = arrayOf(
+            getString(R.string.set_handle, modeNames[mode]),
+            getString(R.string.set_speed, limitNames[limit]),
+            getString(R.string.set_rows, rowNames[rows]),
+            getString(R.string.set_accent),
+            getString(R.string.set_photo, getString(if (hasPhoto) R.string.photo_set else R.string.photo_none)),
+            getString(R.string.set_night, nightNames[night]),
+            getString(R.string.set_prayer, onOff(prayerOn)),
+            getString(R.string.set_lang, langNames[lang]),
+            getString(R.string.set_media, if (hasMediaAccess()) onOff(true) else getString(R.string.media_need)),
+            getString(R.string.set_keys, if (KeysService.instance != null) onOff(true) else getString(R.string.keys_need))
+        )
+        AlertDialog.Builder(this)
+            .setTitle(R.string.settings_title)
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> choose(R.string.settings_title, modeNames, mode) { setHandleMode(modes[it]) }
+                    1 -> choose(R.string.settings_title, limitNames, limit) {
+                        prefs.edit().putInt("speed_limit", limits[it]).apply()
+                    }
+                    2 -> choose(R.string.settings_title, rowNames, rows) {
+                        prefs.edit().putInt("rows", it + 2).apply()
+                        buildTiles()
+                        applySizes()
+                        renderTiles()
+                    }
+                    3 -> choose(R.string.set_accent, accentNames, Options.ACCENTS.indexOf(accent)) {
+                        prefs.edit().putInt("accent", Options.ACCENTS[it]).apply()
+                        applyAccent()
+                        renderTiles()
+                        syncHandle()
+                    }
+                    4 -> if (!hasPhoto) choosePhoto() else {
+                        val photo = arrayOf(getString(R.string.photo_choose), getString(R.string.photo_remove))
+                        AlertDialog.Builder(this)
+                            .setItems(photo) { _, pick ->
+                                if (pick == 0) choosePhoto() else {
+                                    wallpaperFile().delete()
+                                    loadWallpaper()
+                                }
+                            }
+                            .show()
+                    }
+                    5 -> choose(R.string.settings_title, nightNames, night) {
+                        prefs.edit().putInt("night", it).apply()
+                        renderNight()
+                    }
+                    6 -> {
+                        prefs.edit().putBoolean("prayer", !prayerOn).apply()
+                        renderPrayer()
+                    }
+                    7 -> choose(R.string.settings_title, langNames, lang) {
+                        if (it != lang) {
+                            // commit, not apply: the new activity reads it straight away.
+                            prefs.edit().putString("lang", langs[it]).commit()
+                            stopService(Intent(this, HandleService::class.java))
+                            recreate()
+                        }
+                    }
+                    8 -> {
+                        if (!hasMediaAccess()) Toast.makeText(this, R.string.media_hint, Toast.LENGTH_LONG).show()
+                        open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS), getString(R.string.app_name))
+                    }
+                    9 -> open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), getString(R.string.app_name))
+                }
+            }
+            .show()
+    }
+
     // ---------------------------------------------------------------- sizing
 
     private fun px(view: TextView, units: Float) {
         view.setTextSize(TypedValue.COMPLEX_UNIT_PX, u * units)
+    }
+
+    private fun square(view: View, size: Int) {
+        val params = view.layoutParams
+        params.width = size
+        params.height = size
+        view.layoutParams = params
     }
 
     private fun applySizes() {
@@ -442,6 +945,7 @@ class MainActivity : Activity() {
         u = height / 100f
 
         px(date, 4.6f)
+        px(prayer, 4f)
         px(heading, 5.2f)
         px(unit, 3.8f)
         px(statusGps, 3.9f)
@@ -456,16 +960,28 @@ class MainActivity : Activity() {
         // Speed: three digits, with room for the heading and unit beside them.
         speed.setTextSize(TypedValue.COMPLEX_UNIT_PX, min(u * 21f, (panelWidth - u * 14f) / 1.8f))
 
-        val iconSize = (u * 17f).roundToInt()
+        // Twelve tiles are shorter than eight, so their icons and labels shrink.
+        val three = slots > 8
+        val iconSize = (u * (if (three) 11f else 17f)).roundToInt()
         for (tile in tiles) {
             val icon = tile.findViewById<ImageView>(R.id.icon)
-            val params = icon.layoutParams
-            params.width = iconSize
-            params.height = iconSize
-            icon.layoutParams = params
-            px(tile.findViewById(R.id.label), 4f)
+            square(icon, iconSize)
+            val label = tile.findViewById<TextView>(R.id.label)
+            px(label, if (three) 3.3f else 4f)
+            (label.layoutParams as ViewGroup.MarginLayoutParams).topMargin = (u * (if (three) 1f else 2.4f)).roundToInt()
         }
         gridAdapter.notifyDataSetChanged()
+
+        square(npArt, (u * 8f).roundToInt())
+        for (id in intArrayOf(R.id.npPrev, R.id.npPlay, R.id.npNext)) {
+            val button = findViewById<ImageView>(id)
+            square(button, (u * 10f).roundToInt())
+            val pad = (u * 2.2f).roundToInt()
+            button.setPadding(pad, pad, pad, pad)
+        }
+        px(npTitle, 3.8f)
+        px(npArtist, 3.2f)
+        px(trip, 3.4f)
 
         px(findViewById(R.id.compassTitle), 3.4f)
         px(coords, 3.4f)
@@ -528,6 +1044,23 @@ class MainActivity : Activity() {
         }.start()
     }
 
+    /** Fills the tile rows for the chosen count: two rows of four, or three. */
+    private fun buildTiles() {
+        val rows = Options.rows(prefs)
+        slots = rows * 4
+        val views = arrayOf<LinearLayout>(findViewById(R.id.row1), findViewById(R.id.row2), findViewById(R.id.row3))
+        for (row in views) row.removeAllViews()
+        views[2].visibility = if (rows == 3) View.VISIBLE else View.GONE
+        tiles.clear()
+        val inflater = LayoutInflater.from(this)
+        for (i in 0 until slots) {
+            val row = views[i / 4]
+            val tile = inflater.inflate(R.layout.tile, row, false)
+            row.addView(tile)
+            tiles.add(tile)
+        }
+    }
+
     /** The app in a tile: the user's choice if there is one, otherwise the default. */
     private fun slotComponent(slot: Int): ComponentName? {
         val saved = prefs.getString("slot_$slot", null)
@@ -558,12 +1091,13 @@ class MainActivity : Activity() {
             barApps.putString(HandleService.PREF_BAR_APP + i, component?.flattenToString() ?: "")
         }
         barApps.apply()
-        for (slot in 0 until SLOTS) {
+        for (slot in 0 until slots) {
             val tile = tiles[slot]
+            tile.backgroundTintList = null
             val icon = tile.findViewById<ImageView>(R.id.icon)
             val label = tile.findViewById<TextView>(R.id.label)
 
-            if (slot == SLOTS - 1) {
+            if (slot == slots - 1) {
                 tile.setBackgroundResource(R.drawable.tile_bg)
                 icon.setImageResource(R.drawable.ic_apps)
                 label.setText(R.string.all_apps)
@@ -581,6 +1115,7 @@ class MainActivity : Activity() {
             } else if (entry.component.packageName == AUTOKIT) {
                 // The CarPlay dongle app is the main thing on this screen.
                 tile.setBackgroundResource(R.drawable.tile_bg_hero)
+                tile.backgroundTintList = ColorStateList.valueOf(accent)
                 icon.setImageDrawable(entry.icon)
                 label.setText(R.string.carplay)
                 label.setTextColor(getColor(R.color.on_accent))
@@ -670,7 +1205,7 @@ class MainActivity : Activity() {
     }
 
     private fun pinMenu(entry: AppEntry) {
-        val names = Array(SLOTS - 1) { slot ->
+        val names = Array(slots - 1) { slot ->
             val current = entryFor(slotComponent(slot))?.label ?: getString(R.string.tile_empty)
             getString(R.string.tile_n, slot + 1, current)
         }
@@ -752,11 +1287,17 @@ class MainActivity : Activity() {
             val kmh = if (location.hasSpeed()) (location.speed * 3.6f).roundToInt() else 0
             // Below walking pace GPS speed is noise; show a steady zero when parked.
             speed.text = if (kmh < 3) "0" else kmh.toString()
+            val limit = Options.speedLimit(prefs)
+            speed.setTextColor(getColor(if (limit > 0 && kmh > limit) R.color.bad else R.color.text))
             if (kmh >= 5 && location.hasBearing()) {
-                heading.text = COMPASS[(((location.bearing + 22.5f) / 45f).toInt()) % 8]
+                heading.text = compass8[CompassView.cardinalIndex(location.bearing)]
                 headingDeg = location.bearing
             }
             lastLocation = location
+            if (lastFixAt - positionSavedAt > 60_000L) {
+                positionSavedAt = lastFixAt
+                Options.savePosition(prefs, location.latitude, location.longitude)
+            }
             updateDrive(location)
         }
 
@@ -790,15 +1331,23 @@ class MainActivity : Activity() {
         }
     }
 
-    /** Blank the speed if fixes stop arriving (garage, tunnel), so a stale number never shows. */
+    /**
+     * Every two seconds: blank the speed if fixes stop arriving (garage, tunnel),
+     * so a stale number never shows, and refresh the trip, the next prayer and
+     * the night dimming.
+     */
     private val staleCheck = object : Runnable {
         override fun run() {
             if (!gpsListening || SystemClock.elapsedRealtime() - lastFixAt > 5000) {
                 speed.text = "–"
+                speed.setTextColor(getColor(R.color.text))
                 heading.text = ""
                 headingDeg = null
                 compass.heading = null
             }
+            renderTrip()
+            renderPrayer()
+            renderNight()
             ui.postDelayed(this, 2000)
         }
     }
@@ -1023,7 +1572,6 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        private const val SLOTS = 8
         private const val AUTOKIT = "cn.manstep.phonemirrorBox"
         private const val PREF_HANDLE_ASKED = "handle_asked"
 
@@ -1036,11 +1584,14 @@ class MainActivity : Activity() {
         private const val WEATHER_RETRY_MS = 60_000L
         private const val WEATHER_MOVE_M = 25_000f
 
-        private val COMPASS = arrayOf("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+        private const val REQUEST_PHOTO = 2
+        private const val WALLPAPER_FILE = "wallpaper.jpg"
+        /** How dark the night veil is: enough to stop the glare, not enough to hide the tiles. */
+        private const val NIGHT_ALPHA = 0.38f
 
         /**
          * What each tile holds until the user changes it: the first installed
-         * package in each list wins. Tile 8 is always "All apps".
+         * package in each list wins. The last tile is always "All apps".
          */
         private val DEFAULTS: List<List<String>> = listOf(
             listOf(AUTOKIT),

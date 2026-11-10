@@ -24,8 +24,8 @@
     <string name="cant_open">Can\'t open %1$s</string>
 
     <string name="handle_channel">Home handle</string>
-    <string name="handle_running">Home handle is on</string>
-    <string name="handle_running_detail">Touch the screen to show the home bar</string>
+    <string name="handle_running">Masar is running</string>
+    <string name="handle_running_detail">Home bar, trip and speed alert</string>
     <string name="handle_bar_on">Home bar on. Touch the screen in any app and it appears for a few seconds.</string>
     <string name="handle_pill_on">Home pill on. In another app, touch the screen, then tap the white pill.</string>
     <string name="handle_off">Home handle off</string>
@@ -64,4 +64,67 @@
     <string name="wx_showers">Showers</string>
     <string name="wx_thunder">Thunderstorm</string>
     <string name="wx_unknown">–</string>
+    <!-- Compass points, clockwise from north -->
+    <string-array name="compass_4">
+        <item>N</item><item>E</item><item>S</item><item>W</item>
+    </string-array>
+    <string-array name="compass_8">
+        <item>N</item><item>NE</item><item>E</item><item>SE</item><item>S</item><item>SW</item><item>W</item><item>NW</item>
+    </string-array>
+
+    <!-- Now playing -->
+    <string name="media_label">Masar now playing</string>
+    <string name="np_previous">Previous</string>
+    <string name="np_play_pause">Play or pause</string>
+    <string name="np_next">Next</string>
+
+    <!-- Speed alert -->
+    <string name="speed_chip">%1$d km/h</string>
+
+    <!-- Prayer times -->
+    <string-array name="prayers">
+        <item>Fajr</item><item>Dhuhr</item><item>Asr</item><item>Maghrib</item><item>Isha</item>
+    </string-array>
+    <string name="prayer_next">%1$s %2$s · in %3$s</string>
+    <string name="prayer_title">Prayer times today</string>
+    <string name="prayer_sunrise">Sunrise</string>
+    <string name="prayer_note">Umm al-Qura method, worked out from GPS. A mosque near you may differ by a minute or two.</string>
+
+    <!-- Trip -->
+    <string name="trip_line">Trip %1$s km · %2$s\nAvg %3$d · Max %4$d km/h</string>
+    <string name="trip_reset">Reset this trip?</string>
+
+    <!-- Settings menu (long-press the clock) -->
+    <string name="settings_title">Masar settings</string>
+    <string name="set_handle">Home handle: %1$s</string>
+    <string name="mode_bar">Bar</string>
+    <string name="mode_pill">Pill</string>
+    <string name="mode_off">Off</string>
+    <string name="mode_on">On</string>
+    <string name="set_speed">Speed alert: %1$s</string>
+    <string name="speed_value">%1$d km/h</string>
+    <string name="set_rows">Tiles: %1$s</string>
+    <string name="rows_2">8, in two rows</string>
+    <string name="rows_3">12, in three rows</string>
+    <string name="set_accent">Accent colour</string>
+    <string-array name="accents">
+        <item>Amber</item><item>Blue</item><item>Green</item><item>Red</item><item>Purple</item><item>White</item>
+    </string-array>
+    <string name="set_photo">Background photo: %1$s</string>
+    <string name="photo_none">None</string>
+    <string name="photo_set">Set</string>
+    <string name="photo_choose">Choose a photo</string>
+    <string name="photo_remove">Remove the photo</string>
+    <string name="photo_failed">That photo could not be opened</string>
+    <string name="set_night">Night dimming: %1$s</string>
+    <string name="night_auto">After sunset</string>
+    <string name="night_always">Always</string>
+    <string name="set_prayer">Prayer times: %1$s</string>
+    <string name="set_lang">Language: %1$s</string>
+    <string name="lang_system">Same as the unit</string>
+    <string name="set_media">Now playing: %1$s</string>
+    <string name="media_need">Needs notification access</string>
+    <string name="media_hint">Turn on Masar under Notification access to show what is playing</string>
+    <string name="set_keys">Back and Recents buttons: %1$s</string>
+    <string name="keys_need">Needs the Accessibility switch</string>
 </resources>

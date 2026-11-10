@@ -1,5 +1,6 @@
 package cloud.ammarhussein.masar
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.app.Notification
@@ -10,13 +11,19 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -30,31 +37,33 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import android.util.TypedValue
 
 /**
+ * Masar's one background service. It keeps running while other apps are in
+ * front, and does the things that have to carry on then:
+ *
  * The home handle: a way to reach Home, Back and the volume from any app,
  * including ones that hide the system navigation bar such as CarPlay in AutoKit.
- *
  * Touch the screen anywhere and it appears at the bottom for a few seconds,
  * then goes away again. It has two looks, chosen in Masar ([MODE_BAR],
  * [MODE_PILL]):
  *  - bar: a full row of buttons like the head unit's own bar. Back, Recents,
  *    volume down and up, Home, and the apps from Masar's tiles 2 to 4.
  *  - pill: only a small white capsule. Tap it, or swipe up from it, to go home.
+ * It is made of overlay windows: a one-pixel "watcher" that hears every touch
+ * on the screen without taking it, and the bar or pill, which is only on screen
+ * for those few seconds. This part needs the "display over other apps"
+ * permission.
  *
- * It is made of overlay windows:
- *  - a one-pixel "watcher" that hears every touch on the screen without taking
- *    it (the system sends it an outside-touch notice), and
- *  - the bar or pill, which is only on screen for those few seconds. While it
- *    is gone nothing of ours covers the app underneath.
- *
- * The service runs in the foreground so the system keeps it alive for a whole
- * drive. It needs the "display over other apps" permission; without it the
- * service stops itself.
+ * The trip and the speed alert: it listens to GPS for the whole drive, feeds
+ * [Trip], and when the speed passes the chosen limit it beeps once and shows
+ * the speed in red at the top of the screen until the car slows down.
  */
 class HandleService : Service() {
 
@@ -75,7 +84,15 @@ class HandleService : Service() {
     private var downY = 0f
     private var fired = false
 
+    private var gpsOn = false
+    private var overLimit = false
+    private var chip: TextView? = null
+
     // ---------------------------------------------------------------- lifecycle
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(Options.localized(newBase))
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -85,14 +102,11 @@ class HandleService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!allowed(this)) {
-            stopSelf()
-            return START_NOT_STICKY
-        }
         // The look may have changed in Masar: drop whatever is showing.
         removePill()
         removeBar()
         update()
+        startGps()
         // If the system kills the process, bring the handle back when it can.
         return START_STICKY
     }
@@ -102,6 +116,9 @@ class HandleService : Service() {
         removePill()
         removeBar()
         removeWatcher()
+        removeChip()
+        stopGps()
+        Trip.save(Options.prefs(this))
         super.onDestroy()
     }
 
@@ -133,7 +150,10 @@ class HandleService : Service() {
             .setOngoing(true)
             .build()
         if (Build.VERSION.SDK_INT >= 34) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            // The location type may only be claimed once the permission is held.
+            var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            if (hasLocation()) types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            startForeground(NOTIFICATION_ID, notification, types)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
@@ -259,7 +279,9 @@ class HandleService : Service() {
         addButton(row, getDrawable(R.drawable.ic_bar_recents), ICON) { pressKey(AccessibilityService.GLOBAL_ACTION_RECENTS) }
         addButton(row, getDrawable(R.drawable.ic_bar_vol_down), ICON) { volume(AudioManager.ADJUST_LOWER) }
         addButton(row, getDrawable(R.drawable.ic_bar_vol_up), ICON) { volume(AudioManager.ADJUST_RAISE) }
-        addButton(row, getDrawable(R.drawable.ic_bar_home), ICON_HOME) {
+        val homeIcon = getDrawable(R.drawable.ic_bar_home)?.mutate()
+        homeIcon?.setTint(Options.accent(Options.prefs(this)))
+        addButton(row, homeIcon, ICON_HOME) {
             goHome()
             removeBar()
         }
@@ -430,6 +452,126 @@ class HandleService : Service() {
         removePill()
     }
 
+    // ---------------------------------------------------------------- trip and speed alert
+
+    private fun hasLocation(): Boolean =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    @SuppressLint("MissingPermission")
+    private fun startGps() {
+        if (gpsOn || !hasLocation()) return
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        try {
+            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, locationListener)
+            gpsOn = true
+        } catch (ex: Exception) {
+            // No GPS provider on this unit
+        }
+    }
+
+    private fun stopGps() {
+        if (!gpsOn) return
+        gpsOn = false
+        try {
+            (getSystemService(Context.LOCATION_SERVICE) as LocationManager).removeUpdates(locationListener)
+        } catch (ex: Exception) {
+            // Already stopped
+        }
+    }
+
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            val prefs = Options.prefs(this@HandleService)
+            Trip.onFix(location, prefs)
+            checkSpeed(location, Options.speedLimit(prefs))
+        }
+
+        // These three are abstract on Android 10, so they must be overridden.
+        @Deprecated("Deprecated in Java")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {
+        }
+
+        override fun onProviderEnabled(provider: String) {
+        }
+
+        override fun onProviderDisabled(provider: String) {
+        }
+    }
+
+    /**
+     * Over the limit: one beep as the speed crosses it, and a red speed readout
+     * at the top of the screen while it stays over. Slowing to a little under
+     * the limit clears it, so hovering at the limit doesn't keep beeping.
+     */
+    private fun checkSpeed(location: Location, limit: Int) {
+        val kmh = if (location.hasSpeed()) (location.speed * 3.6f).roundToInt() else 0
+        if (limit <= 0) {
+            overLimit = false
+            removeChip()
+            return
+        }
+        if (!overLimit && kmh > limit) {
+            overLimit = true
+            beep()
+        } else if (overLimit && kmh < limit - 3) {
+            overLimit = false
+        }
+        // Masar shows the speed in red itself; the chip is for other apps.
+        if (overLimit && !homeVisible && Settings.canDrawOverlays(this)) showChip(kmh) else removeChip()
+    }
+
+    private fun beep() {
+        try {
+            val tone = ToneGenerator(AudioManager.STREAM_MUSIC, 90)
+            tone.startTone(ToneGenerator.TONE_PROP_BEEP2, 350)
+            ui.postDelayed({ tone.release() }, 800)
+        } catch (ex: Exception) {
+            // No tone generator on this unit: the red readout still shows
+        }
+    }
+
+    private fun showChip(kmh: Int) {
+        var view = chip
+        if (view == null) {
+            u = screenSize().second / 100f
+            view = TextView(this)
+            view.setTextColor(0xFFFFFFFF.toInt())
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, u * 6f)
+            view.gravity = Gravity.CENTER
+            val pad = (u * 2.2f).roundToInt()
+            view.setPadding(pad * 2, pad / 2, pad * 2, pad / 2)
+            val shape = GradientDrawable()
+            shape.cornerRadius = u * 6f
+            shape.setColor(CHIP_COLOR)
+            view.background = shape
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            params.y = (u * 2f).roundToInt()
+            params.title = "Masar speed alert"
+            try {
+                wm.addView(view, params)
+                chip = view
+            } catch (ex: Exception) {
+                return
+            }
+        }
+        view.text = getString(R.string.speed_chip, kmh)
+    }
+
+    private fun removeChip() {
+        val view = chip ?: return
+        chip = null
+        removeWindow(view)
+    }
+
     // ---------------------------------------------------------------- shared
 
     private fun goHome() {
@@ -466,6 +608,7 @@ class HandleService : Service() {
         private const val ICON_HOME = 7f
         private const val ICON_APP = 6.4f
         private const val BAR_COLOR = 0xF5111418.toInt()
+        private const val CHIP_COLOR = 0xF2D32F2F.toInt()
 
         /** Pill length and thickness, in percent of screen height. On 1200x720: 158 x 20 px. */
         private const val PILL_LONG = 22f
@@ -506,6 +649,7 @@ class HandleService : Service() {
             set(value) {
                 field = value
                 current?.update()
+                if (value) current?.removeChip()
             }
 
         fun mode(context: Context): String {

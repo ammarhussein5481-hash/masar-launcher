@@ -48,6 +48,17 @@
             android:gravity="center"
             android:maxLines="1"
             android:textColor="@color/text_dim" />
+
+        <!-- This trip: distance and time, then average and top speed. Long-press to reset. -->
+        <TextView
+            android:id="@+id/trip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.15"
+            android:maxLines="2"
+            android:textColor="@color/text" />
     </LinearLayout>
 
     <FrameLayout

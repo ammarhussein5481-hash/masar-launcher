@@ -88,6 +88,14 @@ class TileMapView @JvmOverloads constructor(context: Context, attrs: AttributeSe
     }
     private val creditBack = Paint().apply { color = 0xB00A0C0F.toInt() }
     private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = context.getColor(R.color.accent) }
+
+    /** The colour of the car's marker. */
+    var accent: Int
+        get() = dot.color
+        set(value) {
+            dot.color = value
+            invalidate()
+        }
     private val dotRing = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = 2.5f * dp

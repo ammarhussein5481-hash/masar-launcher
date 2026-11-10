@@ -15,6 +15,8 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- Trip and speed alert keep reading GPS while another app (CarPlay) is in front -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <queries>
         <intent>
@@ -51,10 +53,22 @@
         <service
             android:name=".HandleService"
             android:exported="false"
-            android:foregroundServiceType="specialUse">
+            android:foregroundServiceType="location|specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Home handle overlay: a bar drawn over other apps on touch, with Home, Back and volume buttons" />
+        </service>
+
+        <!-- Notification access is what Android asks of an app that wants to see
+             what is playing. Masar reads no notifications; see MediaService. -->
+        <service
+            android:name=".MediaService"
+            android:exported="true"
+            android:label="@string/media_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
         </service>
 
         <!-- Only so the home bar can press Back and Recents; asks for no events. -->
