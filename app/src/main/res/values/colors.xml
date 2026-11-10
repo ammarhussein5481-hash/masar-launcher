@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0A0C0F</color>
+    <color name="tile">#151A21</color>
+    <color name="tile_stroke">#222A35</color>
+    <color name="ripple">#33FFFFFF</color>
+    <color name="text">#F2F4F7</color>
+    <color name="text_dim">#9AA4B2</color>
+    <color name="accent">#FFB020</color>
+    <color name="on_accent">#1A1205</color>
+    <color name="ok">#3DDC84</color>
+    <color name="bad">#FF5A5A</color>
+    <color name="idle">#5B6573</color>
+</resources>

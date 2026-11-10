@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Masar</string>
+    <string name="all_apps">All apps</string>
+    <string name="close">Close</string>
+    <string name="carplay">CarPlay</string>
+    <string name="add_app">Add app</string>
+    <string name="unit_kmh">km/h</string>
+    <string name="net_online">Online</string>
+    <string name="net_no_internet">Connected, no internet</string>
+    <string name="net_offline">Offline</string>
+    <string name="gps_tap">Tap to turn on speed</string>
+    <string name="gps_searching">GPS searching</string>
+    <string name="gps_off">GPS off</string>
+    <string name="gps_sats">GPS · %1$d satellites</string>
+    <string name="pick_title">Choose an app for this tile</string>
+    <string name="pick_empty">Leave this tile empty</string>
+    <string name="menu_pin">Pin to a home tile</string>
+    <string name="menu_info">App info</string>
+    <string name="menu_uninstall">Uninstall</string>
+    <string name="pin_title">Pin to which tile?</string>
+    <string name="tile_n">Tile %1$d · %2$s</string>
+    <string name="tile_empty">empty</string>
+    <string name="cant_open">Can\'t open %1$s</string>
+</resources>
