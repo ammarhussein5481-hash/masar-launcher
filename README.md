@@ -55,8 +55,10 @@ not on screen it keeps a thin strip along the bottom edge of the screen, on
 top of every other app, with a short faint pill in the middle. **Swipe up**
 from it to bring Masar's home page back. A plain tap does nothing, so
 brushing the bottom edge never presses CarPlay's bottom row by accident.
-The strip is 2% of the screen height tall and disappears whenever Masar
-itself is showing.
+The pill stays invisible until you touch the screen: any touch, anywhere,
+fades it in for about three seconds, without getting in the way of that
+touch. The swipe works whether the pill is showing or not. The strip is 2%
+of the screen height tall and disappears whenever Masar itself is showing.
 
 **Turning it off and on:** long-press the two page dots at the bottom of
 Masar. A message says which way it went, and the choice is remembered. It is

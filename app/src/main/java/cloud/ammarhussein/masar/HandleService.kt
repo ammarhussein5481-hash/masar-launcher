@@ -13,7 +13,9 @@ import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.Gravity
@@ -30,6 +32,10 @@ import kotlin.math.roundToInt
  * The home handle: a thin strip along the bottom edge of the screen, drawn over
  * other apps, with a faint pill in the middle. Swiping up on it brings Masar back.
  *
+ * The pill is invisible until the screen is touched: any touch, anywhere, fades
+ * it in for a few seconds (the window watches outside touches without taking
+ * them). The strip catches a swipe whether the pill is showing or not.
+ *
  * It exists for full-screen apps that hide the navigation bar, mainly CarPlay in
  * the AutoKit app. A plain tap does nothing, so the strip can't press whatever
  * sits underneath it by accident.
@@ -45,6 +51,9 @@ class HandleService : Service() {
     private lateinit var wm: WindowManager
     private var strip: FrameLayout? = null
     private var shown = false
+    private var pill: View? = null
+    private val ui = Handler(Looper.getMainLooper())
+    private val fadeOut = Runnable { pill?.animate()?.alpha(0f)?.setDuration(FADE_OUT_MS)?.start() }
 
     /** One percent of the screen height, in pixels. All sizes are multiples of it. */
     private var u = 7.2f
@@ -132,6 +141,7 @@ class HandleService : Service() {
         shape.setColor(PILL_COLOR)
         shape.setStroke(max(1, (u * 0.15f).roundToInt()), PILL_EDGE)
         pillView.background = shape
+        pillView.alpha = 0f
 
         val stripView = FrameLayout(this)
         stripView.addView(
@@ -145,7 +155,8 @@ class HandleService : Service() {
             max(4, (u * STRIP_TALL).roundToInt()),
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         )
         params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -154,6 +165,7 @@ class HandleService : Service() {
         try {
             wm.addView(stripView, params)
             strip = stripView
+            pill = pillView
             shown = true
         } catch (ex: Exception) {
             // Permission revoked between the check and now: nothing to draw.
@@ -164,6 +176,8 @@ class HandleService : Service() {
 
     private fun hide() {
         val view = strip
+        ui.removeCallbacks(fadeOut)
+        pill = null
         strip = null
         shown = false
         if (view != null) {
@@ -182,7 +196,14 @@ class HandleService : Service() {
      */
     private fun onStripTouch(view: View, event: MotionEvent): Boolean {
         when (event.actionMasked) {
+            // A touch somewhere else on the screen: only reveal the pill.
+            // The touch itself still goes to the app underneath.
+            MotionEvent.ACTION_OUTSIDE -> {
+                reveal()
+                return false
+            }
             MotionEvent.ACTION_DOWN -> {
+                reveal()
                 downX = event.rawX
                 downY = event.rawY
                 fired = false
@@ -198,6 +219,14 @@ class HandleService : Service() {
             }
         }
         return true
+    }
+
+    /** Fades the pill in, and out again a few seconds after the last touch. */
+    private fun reveal() {
+        val view = pill ?: return
+        ui.removeCallbacks(fadeOut)
+        if (view.alpha < 1f) view.animate().alpha(1f).setDuration(FADE_IN_MS).start()
+        ui.postDelayed(fadeOut, SHOW_MS)
     }
 
     private fun goHome() {
@@ -238,6 +267,11 @@ class HandleService : Service() {
         /** Faint white with a faint dark edge, so it shows on light and dark screens alike. */
         private const val PILL_COLOR = 0x4DFFFFFF
         private const val PILL_EDGE = 0x33000000
+
+        /** How long the pill stays after the last touch, and its fade times. */
+        private const val SHOW_MS = 3000L
+        private const val FADE_IN_MS = 150L
+        private const val FADE_OUT_MS = 400L
 
         const val PREF_ENABLED = "handle_on"
 
