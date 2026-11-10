@@ -32,7 +32,9 @@ object Weather {
     fun download(lat: Double, lon: Double): String {
         val url = String.format(
             Locale.US,
-            "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f" +
+            // Two decimals is about a kilometre: enough for a forecast, and it keeps the
+            // car's exact position off the request.
+            "https://api.open-meteo.com/v1/forecast?latitude=%.2f&longitude=%.2f" +
                 "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,is_day" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
                 "&timezone=auto&forecast_days=4",
