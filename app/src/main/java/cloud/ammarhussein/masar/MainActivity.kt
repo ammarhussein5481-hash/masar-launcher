@@ -60,9 +60,9 @@ class AppEntry(val label: String, val component: ComponentName, val icon: Drawab
  * Page 2, drive: a compass, a small map that follows the car, and the weather.
  * Swipe sideways or tap the dots at the bottom to change page.
  *
- * Long-press the dots, or the handle's status line, to turn the home handle
- * ([HandleService]) on or off: a pill over full-screen apps such as CarPlay
- * that returns to this screen.
+ * Long-press the dots, or the handle's status line, to step the home handle
+ * ([HandleService]) through bar, pill and off: buttons that appear over any
+ * app when the screen is touched, for Home, Back and the volume.
  *
  * Every size is derived from the screen height (see [applySizes]), so the layout
  * looks the same on any head unit resolution or density.
@@ -384,15 +384,25 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Steps the home handle through its looks: bar, pill, off, and round again. */
     private fun toggleHandle() {
-        val on = !HandleService.enabled(this)
-        prefs.edit().putBoolean(HandleService.PREF_ENABLED, on).apply()
+        val next = when (HandleService.mode(this)) {
+            HandleService.MODE_BAR -> HandleService.MODE_PILL
+            HandleService.MODE_PILL -> HandleService.MODE_OFF
+            else -> HandleService.MODE_BAR
+        }
+        prefs.edit().putString(HandleService.PREF_MODE, next).apply()
         updateHandleStatus()
-        if (on && !Settings.canDrawOverlays(this)) {
+        if (next != HandleService.MODE_OFF && !Settings.canDrawOverlays(this)) {
             askForOverlay()
             return
         }
-        Toast.makeText(this, if (on) R.string.handle_on else R.string.handle_off, Toast.LENGTH_LONG).show()
+        val message = when (next) {
+            HandleService.MODE_BAR -> R.string.handle_bar_on
+            HandleService.MODE_PILL -> R.string.handle_pill_on
+            else -> R.string.handle_off
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         syncHandle()
     }
 
@@ -402,8 +412,10 @@ class MainActivity : Activity() {
             setStatus(statusHandle, getString(R.string.handle_status_off), R.color.idle)
         } else if (!Settings.canDrawOverlays(this)) {
             setStatus(statusHandle, getString(R.string.handle_status_permission), R.color.accent)
+        } else if (HandleService.mode(this) == HandleService.MODE_PILL) {
+            setStatus(statusHandle, getString(R.string.handle_status_pill), R.color.ok)
         } else {
-            setStatus(statusHandle, getString(R.string.handle_status_on), R.color.ok)
+            setStatus(statusHandle, getString(R.string.handle_status_bar), R.color.ok)
         }
     }
 
@@ -538,6 +550,14 @@ class MainActivity : Activity() {
 
     private fun renderTiles() {
         if (!appsLoaded) return
+        // The home bar shows the apps from tiles 2 to 4; it runs in a service and
+        // reads them from here.
+        val barApps = prefs.edit()
+        for (i in 0 until HandleService.BAR_APPS) {
+            val component = entryFor(slotComponent(i + 1))?.component
+            barApps.putString(HandleService.PREF_BAR_APP + i, component?.flattenToString() ?: "")
+        }
+        barApps.apply()
         for (slot in 0 until SLOTS) {
             val tile = tiles[slot]
             val icon = tile.findViewById<ImageView>(R.id.icon)

@@ -21,7 +21,7 @@ driver needs, with targets big enough to hit without looking twice.
   - **Compass** that turns with the direction of travel, plus coordinates and altitude.
   - **Map** that follows the car. Roads already driven stay visible offline, and a tap opens your navigation app.
   - **Weather** where you are: current conditions and the next three days.
-- **A home handle** over full-screen apps such as CarPlay: touch the screen, tap the pill, and you're back. See [Home handle](#home-handle).
+- **A home handle** over any app, CarPlay included: touch the screen and a bar with Home, Back, volume and your apps appears for a few seconds. See [Home handle](#home-handle).
 - **Scales itself.** Every size is a fraction of the screen height, so it looks the same on any resolution or density.
 - No ads, no trial, no account.
 
@@ -44,44 +44,73 @@ how they know what to send back. The home page works with no connection at all.
 | Tap **+** / **−** on the map | Zooms in or out |
 | Tap the weather | Refreshes it now |
 | Press Home or Back | Returns to the home page |
-| Long-press the dots at the bottom, or the handle's status line | Turns the home handle on or off |
-| Touch the screen in another app, then tap the white pill | Returns to Masar (when the home handle is on) |
+| Long-press the dots at the bottom, or the handle's status line | Steps the home handle through bar, pill and off |
+| Touch the screen in any app | Shows the home bar (or pill) for a few seconds |
 
 ## Home handle
 
-Full-screen apps such as CarPlay in the Carlinkit AutoKit app hide the
-system navigation bar, so there is no Home button to press. While Masar is
-not on screen, **touch the screen anywhere** and a white pill appears at the
-bottom centre for about three seconds. **Tap the pill**, or swipe up from
-it, and Masar's home page comes back.
+Some apps hide the system navigation bar, CarPlay in the Carlinkit AutoKit
+app among them, and you may prefer the bar hidden everywhere. The home
+handle gives the buttons back on demand: **touch the screen anywhere** and
+it appears at the bottom for about four seconds, then goes away.
 
-The touch that reveals the pill still goes to the app underneath as normal.
-While the pill is hidden nothing of Masar's covers the screen, so it never
-swallows a tap meant for another app.
+It has two looks. Long-press the handle's status line on Masar's home page
+(or the two page dots) to step through **bar → pill → off**:
 
-**State:** the third status line on Masar's home page says whether the
-handle is on, off, or waiting for its permission. Tap that line to grant a
-missing permission.
+- **Bar** (default): a row of buttons like the head unit's own bar. Back,
+  Recents, volume down, volume up, Home, and the apps from Masar's tiles 2
+  to 4. It works in every app, Masar included.
+- **Pill**: a small white capsule. Tap it, or swipe up from it, to go home.
+  It covers far less of the screen, and stays away while Masar is in front.
 
-**Turning it off and on:** long-press that status line, or the two page
-dots at the bottom of Masar. The choice is remembered. It is on by default.
+The touch that reveals it still goes to the app underneath as normal. While
+it is hidden nothing of Masar's covers the screen. While the bar is showing
+it does cover the bottom tenth of the screen, so a control an app puts there
+is out of reach for those four seconds; if that gets in the way, use the pill.
 
-It runs as a foreground service, so Android keeps it alive while Masar is in
-the background for a whole drive. A quiet "Home handle is on" notification is
-the price of that. After a reboot it comes back as soon as Masar starts as
-the home app.
+**State:** the third status line on Masar's home page says which look is on,
+that the handle is off, or that it is waiting for its permission. Tap the
+line to grant a missing permission.
+
+**Back and Recents** can only be pressed through an accessibility service,
+so Masar has a small one that asks for no events and never reads the screen.
+Switch it on once under Settings → Accessibility → *Masar Back and Recents
+buttons*, or over adb:
+
+```bash
+adb shell settings put secure enabled_accessibility_services cloud.ammarhussein.masar/cloud.ammarhussein.masar.KeysService
+adb shell settings put secure accessibility_enabled 1
+```
+
+Until then those two buttons open the Accessibility screen. Home, volume and
+the app buttons need nothing extra.
+
+**Hiding the system bar everywhere** (Android 10 and older) is a system
+setting, not something a launcher can do:
+
+```bash
+adb shell settings put global policy_control immersive.navigation=*
+```
+
+Undo it with `adb shell settings put global policy_control null`. With it
+on, a swipe up from the bottom edge still brings the real bar back briefly.
+
+The handle runs as a foreground service, so Android keeps it alive while
+Masar is in the background for a whole drive. A quiet "Home handle is on"
+notification is the price of that. After a reboot it comes back as soon as
+Masar starts as the home app.
 
 **Permission:** the handle draws over other apps, which needs the "Display
-over other apps" permission. Masar opens that system screen for you the
-first time (and whenever you turn the handle on without it). On head units
-where that screen is missing or doesn't stick, grant it over adb:
+over other apps" permission. Tapping the amber status line opens that system
+screen. On head units where the screen is missing or doesn't stick, grant it
+over adb:
 
 ```bash
 adb shell appops set cloud.ammarhussein.masar SYSTEM_ALERT_WINDOW allow
 ```
 
-Then press Home (or restart Masar) and the handle appears in other apps.
-To take the permission away again, use `deny` instead of `allow`.
+Then press Home (or restart Masar). To take the permission away again, use
+`deny` instead of `allow`.
 
 ## Install
 

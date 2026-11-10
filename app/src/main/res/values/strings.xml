@@ -25,13 +25,18 @@
 
     <string name="handle_channel">Home handle</string>
     <string name="handle_running">Home handle is on</string>
-    <string name="handle_running_detail">Touch the screen, then tap the white pill to return to Masar</string>
-    <string name="handle_on">Home handle on. In another app, touch the screen, then tap the white pill.</string>
+    <string name="handle_running_detail">Touch the screen to show the home bar</string>
+    <string name="handle_bar_on">Home bar on. Touch the screen in any app and it appears for a few seconds.</string>
+    <string name="handle_pill_on">Home pill on. In another app, touch the screen, then tap the white pill.</string>
     <string name="handle_off">Home handle off</string>
     <string name="handle_need_permission">Allow Masar to display over other apps to use the home handle</string>
-    <string name="handle_status_on">Home handle on</string>
+    <string name="handle_status_bar">Home bar on</string>
+    <string name="handle_status_pill">Home pill on</string>
     <string name="handle_status_off">Home handle off</string>
     <string name="handle_status_permission">Home handle · tap to allow</string>
+    <string name="keys_label">Masar Back and Recents buttons</string>
+    <string name="keys_description">Lets the Masar home bar press Back and Recents. It does not read the screen or collect anything.</string>
+    <string name="keys_needed">Turn on \"Masar Back and Recents buttons\" under Accessibility to use this button</string>
 
     <string name="compass_title">Compass</string>
     <string name="compass_hint">Drive to get a heading</string>
