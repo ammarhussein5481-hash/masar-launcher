@@ -212,17 +212,20 @@ object Obd {
         ask(link, "ATH0", 2000)
         ask(link, "ATSP0", 2000)
         supported.fill(false)
-        var first: IntArray? = null
+        // Several computers answer these (engine, transmission), each with its
+        // own list, in no fixed order. A value counts as available if any of
+        // them has it.
+        var first: List<IntArray> = emptyList()
         // The first request also makes the dongle search for the protocol, which can take a few tries.
         for (attempt in 0 until 4) {
-            first = bytes(ask(link, "0100", 9000), "4100")
-            if (first != null) break
+            first = allBytes(ask(link, "0100", 9000), "4100")
+            if (first.isNotEmpty()) break
             pause(1500)
         }
-        if (first == null) throw IOException("The car did not answer")
-        mark(first, 0x00)
-        if (supported[0x20]) bytes(ask(link, "0120", 3000), "4120")?.let { mark(it, 0x20) }
-        if (supported[0x40]) bytes(ask(link, "0140", 3000), "4140")?.let { mark(it, 0x40) }
+        if (first.isEmpty()) throw IOException("The car did not answer")
+        for (bits in first) mark(bits, 0x00)
+        if (supported[0x20]) for (bits in allBytes(ask(link, "0120", 3000), "4120")) mark(bits, 0x20)
+        if (supported[0x40]) for (bits in allBytes(ask(link, "0140", 3000), "4140")) mark(bits, 0x40)
         transWorks = transTemp(link) != null
     }
 
@@ -293,8 +296,12 @@ object Obd {
         return text.toString()
     }
 
-    /** The bytes that follow [prefix] in the first line of [answer] that starts with it. */
-    private fun bytes(answer: String, prefix: String): IntArray? {
+    /** The bytes that follow [prefix] in the first line of [answer] that has it. */
+    private fun bytes(answer: String, prefix: String): IntArray? = allBytes(answer, prefix).firstOrNull()
+
+    /** The same for every line that has [prefix]: one entry per computer that answered. */
+    private fun allBytes(answer: String, prefix: String): List<IntArray> {
+        val all = ArrayList<IntArray>()
         for (line in answer.split('\r', '\n')) {
             val at = line.indexOf(prefix)
             if (at < 0) continue
@@ -305,9 +312,9 @@ object Obd {
             } catch (ex: NumberFormatException) {
                 continue
             }
-            return out
+            all.add(out)
         }
-        return null
+        return all
     }
 
     /**
