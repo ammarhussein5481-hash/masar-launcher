@@ -104,6 +104,10 @@ class MainActivity : Activity() {
     private lateinit var carSpeed: TextView
     private lateinit var carCodes: TextView
     private lateinit var carClear: TextView
+    private lateinit var carStrip: View
+    private lateinit var stripCoolant: TextView
+    private lateinit var stripTrans: TextView
+    private lateinit var stripFuel: TextView
     /** The six reading cells on the Car page: container, label, value. */
     private val carCells = ArrayList<Triple<View, TextView, TextView>>()
     private lateinit var compass: CompassView
@@ -210,6 +214,11 @@ class MainActivity : Activity() {
         carSpeed = findViewById(R.id.carSpeed)
         carCodes = findViewById(R.id.carCodes)
         carClear = findViewById(R.id.carClear)
+        carStrip = findViewById(R.id.carStrip)
+        stripCoolant = findViewById(R.id.stripCoolant)
+        stripTrans = findViewById(R.id.stripTrans)
+        stripFuel = findViewById(R.id.stripFuel)
+        carStrip.setOnClickListener { showPage(2) }
         buildCarCells()
         carStatus.setOnClickListener { chooseDongle() }
         findViewById<View>(R.id.carCheck).setOnClickListener { Obd.readCodes() }
@@ -884,8 +893,38 @@ class MainActivity : Activity() {
     private val carTick = object : Runnable {
         override fun run() {
             if (page == 2) renderCar()
+            if (page == 0) renderCarStrip()
             ui.postDelayed(this, 300)
         }
+    }
+
+    /** Coolant, transmission and fuel in one line on the home page, while the dongle is connected. */
+    private fun renderCarStrip() {
+        val coolant = Obd.coolant
+        val trans = Obd.trans
+        val fuel = Obd.fuel
+        if (Obd.state != Obd.CONNECTED || (coolant == null && trans == null && fuel == null)) {
+            if (carStrip.visibility != View.GONE) carStrip.visibility = View.GONE
+            return
+        }
+        val text = getColor(R.color.text)
+        val warn = Options.ACCENTS[0]
+        val bad = getColor(R.color.bad)
+        fun show(view: TextView, label: Int, value: String?, color: Int) {
+            view.visibility = if (value == null) View.GONE else View.VISIBLE
+            if (value != null) {
+                val line = getString(R.string.strip_item, getString(label), value)
+                if (view.text.toString() != line) view.text = line
+                view.setTextColor(color)
+            }
+        }
+        show(stripCoolant, R.string.car_coolant, coolant?.let { getString(R.string.car_degrees, it) },
+            if (coolant != null && coolant >= 113) bad else if (coolant != null && coolant >= 108) warn else text)
+        show(stripTrans, R.string.car_trans, trans?.let { getString(R.string.car_degrees, it) },
+            if (trans != null && trans >= 120) bad else if (trans != null && trans >= 110) warn else text)
+        show(stripFuel, R.string.car_fuel, fuel?.let { getString(R.string.car_percent, it) },
+            if (fuel != null && fuel <= 8) bad else if (fuel != null && fuel <= 15) warn else text)
+        if (carStrip.visibility != View.VISIBLE) carStrip.visibility = View.VISIBLE
     }
 
     private fun renderCar() {
@@ -906,10 +945,10 @@ class MainActivity : Activity() {
         val bad = getColor(R.color.bad)
         val rows = ArrayList<Triple<String, String, Int>>()
         Obd.coolant?.let {
-            rows.add(Triple(getString(R.string.car_coolant), getString(R.string.car_degrees, it), if (it >= 118) bad else if (it >= 110) warn else text))
+            rows.add(Triple(getString(R.string.car_coolant), getString(R.string.car_degrees, it), if (it >= 113) bad else if (it >= 108) warn else text))
         }
         Obd.trans?.let {
-            rows.add(Triple(getString(R.string.car_trans), getString(R.string.car_degrees, it), if (it >= 125) bad else if (it >= 110) warn else text))
+            rows.add(Triple(getString(R.string.car_trans), getString(R.string.car_degrees, it), if (it >= 120) bad else if (it >= 110) warn else text))
         }
         Obd.volts?.let {
             val shown = String.format(Locale.US, "%.1f", it)
@@ -1136,6 +1175,9 @@ class MainActivity : Activity() {
         px(npArtist, 3.2f)
         px(trip, 3.4f)
 
+        px(stripCoolant, 3.6f)
+        px(stripTrans, 3.6f)
+        px(stripFuel, 3.6f)
         px(carStatus, 3.4f)
         px(carSpeed, 13f)
         px(findViewById(R.id.carSpeedUnit), 3.8f)

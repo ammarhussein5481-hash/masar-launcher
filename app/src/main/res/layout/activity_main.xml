@@ -196,6 +196,49 @@
                 android:orientation="horizontal"
                 android:visibility="gone" />
 
+            <!-- The car's key figures from the OBD dongle. Tap for the Car page. -->
+            <LinearLayout
+                android:id="@+id/carStrip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="6dp"
+                android:background="@drawable/tile_bg"
+                android:baselineAligned="false"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="horizontal"
+                android:paddingTop="7dp"
+                android:paddingBottom="7dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/stripCoolant"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/stripTrans"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/stripFuel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:textColor="@color/text" />
+            </LinearLayout>
+
             <!-- Now playing: shown only while something on the unit has a media session -->
             <LinearLayout
                 android:id="@+id/nowPlaying"

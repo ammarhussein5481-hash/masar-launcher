@@ -27,6 +27,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
+import java.util.Locale
 import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.Gravity
@@ -88,6 +90,20 @@ class HandleService : Service() {
     private var overLimit = false
     private var chip: TextView? = null
 
+    private var alert: TextView? = null
+    /** Which warning is showing: "", "coolant", "trans", "volts" or "code". */
+    private var alertKey = ""
+    private var voltsOff = 0
+    private var codeText = ""
+    private var codeUntil = 0L
+    private var carWatching = false
+    private val carWatch = object : Runnable {
+        override fun run() {
+            checkCar()
+            ui.postDelayed(this, 2000)
+        }
+    }
+
     // ---------------------------------------------------------------- lifecycle
 
     override fun attachBaseContext(newBase: Context) {
@@ -107,6 +123,11 @@ class HandleService : Service() {
         removeBar()
         update()
         startGps()
+        Obd.start(this)
+        if (!carWatching) {
+            carWatching = true
+            ui.postDelayed(carWatch, 2000)
+        }
         // If the system kills the process, bring the handle back when it can.
         return START_STICKY
     }
@@ -117,6 +138,8 @@ class HandleService : Service() {
         removeBar()
         removeWatcher()
         removeChip()
+        removeAlert()
+        ui.removeCallbacks(carWatch)
         stopGps()
         Trip.save(Options.prefs(this))
         super.onDestroy()
@@ -566,6 +589,114 @@ class HandleService : Service() {
         view.text = getString(R.string.speed_chip, kmh)
     }
 
+    // ---------------------------------------------------------------- car warnings
+
+    /**
+     * Watches the figures from the OBD dongle and puts a red banner over
+     * whatever app is in front when one needs attention: engine or
+     * transmission too hot, charging voltage wrong while the engine runs, or a
+     * fault code that wasn't there before. One beep as each warning starts.
+     */
+    private fun checkCar() {
+        var text: String? = null
+        var key = ""
+        val now = SystemClock.elapsedRealtime()
+        if (Obd.state == Obd.CONNECTED) {
+            val coolant = Obd.coolant
+            val trans = Obd.trans
+            val volts = Obd.volts
+            val rpm = Obd.rpm
+            // A warning that is showing clears a little below where it started.
+            val coolantAt = if (alertKey == "coolant") COOLANT_HOT - 3 else COOLANT_HOT
+            val transAt = if (alertKey == "trans") TRANS_HOT - 3 else TRANS_HOT
+            // Voltage only counts with the engine running, and only if it stays wrong.
+            if (volts != null && rpm != null && rpm > 400 && (volts < VOLTS_LOW || volts > VOLTS_HIGH)) voltsOff++ else voltsOff = 0
+
+            if (coolant != null && coolant >= coolantAt) {
+                text = getString(R.string.alert_coolant, coolant)
+                key = "coolant"
+            } else if (trans != null && trans >= transAt) {
+                text = getString(R.string.alert_trans, trans)
+                key = "trans"
+            } else if (voltsOff >= 5 && volts != null) {
+                text = getString(R.string.alert_volts, String.format(Locale.US, "%.1f", volts))
+                key = "volts"
+            }
+
+            // A fault code is announced once, for a while, when it first appears.
+            val codes = Obd.codes
+            if (codes != null) {
+                val prefs = Options.prefs(this)
+                val joined = codes.joinToString(" ")
+                if (joined != prefs.getString(PREF_CODES_SEEN, "")) {
+                    prefs.edit().putString(PREF_CODES_SEEN, joined).apply()
+                    if (codes.isNotEmpty()) {
+                        codeText = getString(R.string.alert_fault, joined)
+                        codeUntil = now + CODE_SHOW_MS
+                        if (alertKey == "code") alertKey = ""
+                    }
+                }
+            }
+            if (text == null && now < codeUntil) {
+                text = codeText
+                key = "code"
+            }
+        }
+        if (text == null || !Settings.canDrawOverlays(this)) {
+            alertKey = ""
+            removeAlert()
+            return
+        }
+        if (key != alertKey) {
+            alertKey = key
+            beep()
+        }
+        showAlert(text)
+    }
+
+    private fun showAlert(text: String) {
+        var view = alert
+        if (view == null) {
+            u = screenSize().second / 100f
+            view = TextView(this)
+            view.setTextColor(0xFFFFFFFF.toInt())
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, u * 5f)
+            view.gravity = Gravity.CENTER
+            val pad = (u * 2.2f).roundToInt()
+            view.setPadding(pad * 2, pad / 2, pad * 2, pad / 2)
+            val shape = GradientDrawable()
+            shape.cornerRadius = u * 6f
+            shape.setColor(CHIP_COLOR)
+            view.background = shape
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT
+            )
+            // Under the speed chip, so both can show at once.
+            params.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            params.y = (u * 13f).roundToInt()
+            params.title = "Masar car warning"
+            try {
+                wm.addView(view, params)
+                alert = view
+            } catch (ex: Exception) {
+                return
+            }
+        }
+        if (view.text.toString() != text) view.text = text
+    }
+
+    private fun removeAlert() {
+        val view = alert ?: return
+        alert = null
+        removeWindow(view)
+    }
+
     private fun removeChip() {
         val view = chip ?: return
         chip = null
@@ -609,6 +740,14 @@ class HandleService : Service() {
         private const val ICON_APP = 6.4f
         private const val BAR_COLOR = 0xF5111418.toInt()
         private const val CHIP_COLOR = 0xF2D32F2F.toInt()
+
+        // Car warnings. A warm V8 runs up to about 105°C; these are well past normal.
+        private const val COOLANT_HOT = 113
+        private const val TRANS_HOT = 120
+        private const val VOLTS_LOW = 12.0f
+        private const val VOLTS_HIGH = 15.5f
+        private const val CODE_SHOW_MS = 30_000L
+        private const val PREF_CODES_SEEN = "codes_seen"
 
         /** Pill length and thickness, in percent of screen height. On 1200x720: 158 x 20 px. */
         private const val PILL_LONG = 22f

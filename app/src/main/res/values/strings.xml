@@ -155,4 +155,9 @@
     <string name="obd_pair_new">Pair a new device…</string>
     <string name="obd_pick">Choose the OBD dongle</string>
     <string name="obd_none_paired">Pair the dongle in the unit\'s Bluetooth settings first (PIN 1234 or 0000)</string>
+    <string name="strip_item">%1$s %2$s</string>
+    <string name="alert_coolant">Engine hot · %1$d°C</string>
+    <string name="alert_trans">Transmission hot · %1$d°C</string>
+    <string name="alert_volts">Check charging · %1$s V</string>
+    <string name="alert_fault">Fault code · %1$s</string>
 </resources>

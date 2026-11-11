@@ -18,8 +18,9 @@ import java.util.UUID
  * keeps the latest answers in the fields below for the Car page to draw.
  * A value the car does not report stays null and gets no tile.
  *
- * It only talks to the car while Masar is on screen; behind another app it
- * holds the connection and stays quiet.
+ * It stays connected for the whole drive. While Masar is on screen it asks
+ * several times a second; behind another app it only checks the few values
+ * the warnings need ([HandleService] shows those) every few seconds.
  */
 @SuppressLint("MissingPermission")
 object Obd {
@@ -70,6 +71,8 @@ object Obd {
     /** PIDs 0x01 to 0x60 the engine computer says it supports. */
     private val supported = BooleanArray(0x61)
     private var transWorks = false
+    private var failures = 0
+    private const val CODES_EVERY_MS = 120_000L
 
     private val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
 
@@ -126,7 +129,11 @@ object Obd {
             }
             close()
             blank()
-            pause(8000)
+            // Dialling a dongle that isn't there keeps the Bluetooth radio busy,
+            // so the retries thin out, quickest while Masar is on screen.
+            failures = if (state == FAILED) failures + 1 else 0
+            val waitMs = if (HandleService.homeVisible) 8000L else minOf(8000L * (1 + failures), 60_000L)
+            pause(waitMs)
         }
     }
 
@@ -147,8 +154,6 @@ object Obd {
             return
         }
         deviceName = device.name ?: device.address
-        // No point dialling the dongle while another app is in front.
-        if (!HandleService.homeVisible) return
         state = CONNECTING
         try {
             adapter.cancelDiscovery()
@@ -172,10 +177,25 @@ object Obd {
         state = CONNECTED
         wantCodes = true
 
+        failures = 0
         var turn = 0
+        var codesDue = SystemClock.elapsedRealtime() + CODES_EVERY_MS
         while (true) {
+            // New fault codes are looked for every couple of minutes.
+            if (SystemClock.elapsedRealtime() > codesDue) wantCodes = true
+            if (wantCodes) codesDue = SystemClock.elapsedRealtime() + CODES_EVERY_MS
             if (!HandleService.homeVisible) {
-                pause(1000)
+                // Behind another app: just what the warnings need, slowly.
+                if (wantCodes) {
+                    wantCodes = false
+                    codes = parseCodes(ask(link, "03", 5000))
+                    codesAt = System.currentTimeMillis()
+                }
+                rpm = value(link, 0x0C)?.let { if (it.size >= 2) (it[0] * 256 + it[1]) / 4 else null }
+                coolant = value(link, 0x05)?.getOrNull(0)?.minus(40)
+                volts = voltage(link)
+                if (transWorks) trans = transTemp(link)
+                pause(4000)
                 continue
             }
             if (wantClear) {
