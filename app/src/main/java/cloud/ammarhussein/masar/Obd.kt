@@ -86,6 +86,8 @@ object Obd {
     private var oilWorks = 0
     private var tyresWork = 0
     private var mafAt = 0L
+    /** Set if asking the body computer ever left the dongle deaf to the engine. */
+    private var skipBody = false
     private var failures = 0
     private const val CODES_EVERY_MS = 120_000L
 
@@ -337,7 +339,19 @@ object Obd {
         if (extended(link, "7E0", "", "119F", log)?.getOrNull(0)?.let { it in 0..100 } == true) oilWorks = 1
         else if (extended(link, "7E0", "", "4DC0", log) != null) oilWorks = 2
         // Tyres: the body computer on newer trucks, the engine computer on older ones.
-        val body = extended(link, "241", "641", "5005", log)
+        var body: IntArray? = null
+        if (!skipBody) {
+            body = extended(link, "241", "641", "5005", log)
+            // Listening to the body computer means changing the dongle's filter.
+            // If this dongle can't change it back, the engine goes silent: start
+            // over and leave the body computer alone from then on.
+            if (bytes(ask(link, "0100", 4000), "4100") == null) {
+                skipBody = true
+                throw IOException("Dongle stuck on the body computer")
+            }
+        } else {
+            log.append("241 skipped: this dongle cannot switch back\n")
+        }
         if (body != null && body.size >= 2) tyresWork = 1
         else if (extended(link, "7E0", "", "248E", log)?.getOrNull(0)?.let { it in 1..254 } == true) tyresWork = 2
         log.append("oil=").append(oilWorks).append(" tyres=").append(tyresWork).append(" trans=").append(transWorks)
