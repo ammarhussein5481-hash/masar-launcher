@@ -127,4 +127,31 @@
     <string name="media_hint">Turn on Masar under Notification access to show what is playing</string>
     <string name="set_keys">Back and Recents buttons: %1$s</string>
     <string name="keys_need">Needs the Accessibility switch</string>
+    <!-- Car page (OBD dongle) -->
+    <string name="car_speed_note">Speed from the car</string>
+    <string name="car_no_bluetooth">Bluetooth is off or missing</string>
+    <string name="car_no_device">No OBD dongle paired · tap</string>
+    <string name="car_connecting">Connecting to %1$s…</string>
+    <string name="car_connected">%1$s connected</string>
+    <string name="car_failed">%1$s not answering</string>
+    <string name="car_coolant">Coolant</string>
+    <string name="car_trans">Transmission</string>
+    <string name="car_battery">Battery</string>
+    <string name="car_fuel">Fuel</string>
+    <string name="car_intake">Intake air</string>
+    <string name="car_load">Engine load</string>
+    <string name="car_degrees">%1$d°C</string>
+    <string name="car_percent">%1$d%%</string>
+    <string name="car_volts">%1$s V</string>
+    <string name="car_codes_title">Fault codes</string>
+    <string name="car_codes_wait">Not read yet</string>
+    <string name="car_codes_none">No faults\nChecked %1$s</string>
+    <string name="car_codes_some">%1$s\n\nChecked %2$s</string>
+    <string name="car_check">Check again</string>
+    <string name="car_clear">Clear codes</string>
+    <string name="car_clear_ask">Clear the stored fault codes? This also switches off the check-engine light. A real fault will come back.</string>
+    <string name="set_obd">OBD dongle: %1$s</string>
+    <string name="obd_auto">Automatic</string>
+    <string name="obd_pick">Choose the OBD dongle</string>
+    <string name="obd_none_paired">Pair the dongle in the unit\'s Bluetooth settings first (PIN 1234 or 0000)</string>
 </resources>

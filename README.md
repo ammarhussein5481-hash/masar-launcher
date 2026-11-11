@@ -142,6 +142,16 @@ Long-press the clock. Everything is off or neutral until you choose it.
   and darkened so the tiles stay readable.
 - **Language.** English or Arabic, independent of the unit's language.
 
+## Car page (OBD)
+
+Swipe to the third page. With a classic-Bluetooth ELM327 dongle in the OBD
+port and paired in the unit's Bluetooth settings, it shows engine speed, the
+car's own speed, coolant and intake temperature, engine load, battery voltage,
+fuel level where the car reports it, and stored fault codes with a button to
+clear them. On GM trucks it also tries the transmission temperature. Readings
+the car does not give get no tile. Masar picks the paired device with "OBD" in
+its name; tap the status line on the page to choose another.
+
 ## Install
 
 Download `masar.apk` from the [latest release](../../releases/latest), then:

@@ -18,6 +18,12 @@
     <!-- Trip and speed alert keep reading GPS while another app (CarPlay) is in front -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
+    <!-- The Car page talks to a paired ELM327 OBD dongle over Bluetooth -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />

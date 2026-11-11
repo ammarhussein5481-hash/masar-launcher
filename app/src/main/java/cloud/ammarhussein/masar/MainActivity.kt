@@ -96,8 +96,16 @@ class MainActivity : Activity() {
     private lateinit var grid: GridView
 
     private lateinit var page2: View
-    private lateinit var dot0: View
-    private lateinit var dot1: View
+    private lateinit var page3: View
+    private lateinit var pages: List<View>
+    private lateinit var dots: List<View>
+    private lateinit var carStatus: TextView
+    private lateinit var carGauge: GaugeView
+    private lateinit var carSpeed: TextView
+    private lateinit var carCodes: TextView
+    private lateinit var carClear: TextView
+    /** The six reading cells on the Car page: container, label, value. */
+    private val carCells = ArrayList<Triple<View, TextView, TextView>>()
     private lateinit var compass: CompassView
     private lateinit var coords: TextView
     private lateinit var altitude: TextView
@@ -146,7 +154,7 @@ class MainActivity : Activity() {
     private var netRegistered = false
     private var online = false
 
-    /** 0 is home, 1 is the drive page. */
+    /** 0 is home, 1 is the drive page, 2 is the car page. */
     private var page = 0
     private var downX = 0f
     private var downY = 0f
@@ -194,8 +202,24 @@ class MainActivity : Activity() {
         grid = findViewById(R.id.grid)
 
         page2 = findViewById(R.id.page2)
-        dot0 = findViewById(R.id.dot0)
-        dot1 = findViewById(R.id.dot1)
+        page3 = findViewById(R.id.page3)
+        pages = listOf(home, page2, page3)
+        dots = listOf<View>(findViewById(R.id.dot0), findViewById(R.id.dot1), findViewById(R.id.dot2))
+        carStatus = findViewById(R.id.carStatus)
+        carGauge = findViewById(R.id.carGauge)
+        carSpeed = findViewById(R.id.carSpeed)
+        carCodes = findViewById(R.id.carCodes)
+        carClear = findViewById(R.id.carClear)
+        buildCarCells()
+        carStatus.setOnClickListener { chooseDongle() }
+        findViewById<View>(R.id.carCheck).setOnClickListener { Obd.readCodes() }
+        carClear.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setMessage(R.string.car_clear_ask)
+                .setPositiveButton(R.string.car_clear) { _, _ -> Obd.clearCodes() }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        }
         compass = findViewById(R.id.compass)
         coords = findViewById(R.id.coords)
         altitude = findViewById(R.id.altitude)
@@ -255,7 +279,7 @@ class MainActivity : Activity() {
         findViewById<View>(R.id.zoomOut).setOnClickListener { zoomMap(-1) }
         findViewById<View>(R.id.weatherCard).setOnClickListener { refreshWeather(true) }
         val pager = findViewById<View>(R.id.pager)
-        pager.setOnClickListener { showPage(1 - page) }
+        pager.setOnClickListener { showPage((page + 1) % pages.size) }
         pager.setOnLongClickListener {
             toggleHandle()
             true
@@ -323,6 +347,9 @@ class MainActivity : Activity() {
             }
         }
         startMedia()
+        Obd.start(this)
+        ui.removeCallbacks(carTick)
+        ui.post(carTick)
         ui.removeCallbacks(staleCheck)
         ui.post(staleCheck)
     }
@@ -339,6 +366,7 @@ class MainActivity : Activity() {
         HandleService.homeVisible = false
         stopGps()
         stopMedia()
+        ui.removeCallbacks(carTick)
         if (netRegistered) {
             try {
                 val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -400,7 +428,7 @@ class MainActivity : Activity() {
             MotionEvent.ACTION_UP -> if (swiping) {
                 swiping = false
                 val dx = event.x - downX
-                if (abs(dx) > u * 12f) showPage(if (dx < 0) 1 else 0)
+                if (abs(dx) > u * 12f) showPage((page + if (dx < 0) 1 else -1).coerceIn(0, pages.size - 1))
                 return true
             }
             MotionEvent.ACTION_CANCEL -> swiping = false
@@ -409,24 +437,22 @@ class MainActivity : Activity() {
     }
 
     private fun showPage(index: Int) {
-        val changed = index != page
+        val from = page
         page = index
-        val shown = if (index == 0) home else page2
-        val hidden = if (index == 0) page2 else home
-        // INVISIBLE rather than GONE: the hidden page keeps its size, which
+        // INVISIBLE rather than GONE: hidden pages keep their size, which
         // applySizes() reads.
-        hidden.visibility = View.INVISIBLE
-        shown.visibility = View.VISIBLE
-        if (changed) {
+        for (i in pages.indices) pages[i].visibility = if (i == index) View.VISIBLE else View.INVISIBLE
+        val shown = pages[index]
+        if (index != from) {
             shown.animate().cancel()
             shown.alpha = 0f
-            shown.translationX = (if (index == 0) -1 else 1) * u * 8f
+            shown.translationX = (if (index < from) -1 else 1) * u * 8f
             shown.animate().alpha(1f).translationX(0f).setDuration(160).start()
         }
         val idle = getColor(R.color.idle)
-        dot0.backgroundTintList = ColorStateList.valueOf(if (index == 0) accent else idle)
-        dot1.backgroundTintList = ColorStateList.valueOf(if (index == 1) accent else idle)
+        for (i in dots.indices) dots[i].backgroundTintList = ColorStateList.valueOf(if (i == index) accent else idle)
         if (index == 1) refreshWeather(false)
+        if (index == 2) renderCar()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -516,6 +542,7 @@ class MainActivity : Activity() {
         heading.setTextColor(accent)
         prayer.setTextColor(accent)
         compass.accent = accent
+        carGauge.accent = accent
         map.accent = accent
         showPage(page)
     }
@@ -816,6 +843,126 @@ class MainActivity : Activity() {
         open(launcher, active.packageName)
     }
 
+    // ---------------------------------------------------------------- car page
+
+    /** Three rows of two cells; [renderCar] fills as many as the car has readings for. */
+    private fun buildCarCells() {
+        val grid = findViewById<LinearLayout>(R.id.carGrid)
+        val margin = (resources.displayMetrics.density * 6f).roundToInt()
+        val pad = (resources.displayMetrics.density * 14f).roundToInt()
+        for (r in 0 until 3) {
+            val row = LinearLayout(this)
+            row.orientation = LinearLayout.HORIZONTAL
+            row.isBaselineAligned = false
+            grid.addView(row, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            for (c in 0 until 2) {
+                val cell = LinearLayout(this)
+                cell.orientation = LinearLayout.VERTICAL
+                cell.gravity = Gravity.CENTER_VERTICAL
+                cell.setBackgroundResource(R.drawable.card_bg)
+                cell.setPadding(pad, 0, pad, 0)
+                val label = TextView(this)
+                label.setTextColor(getColor(R.color.text_dim))
+                label.typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                label.maxLines = 1
+                val value = TextView(this)
+                value.typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
+                value.includeFontPadding = false
+                value.maxLines = 1
+                cell.addView(label)
+                cell.addView(value)
+                val params = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                params.setMargins(margin, margin, margin, margin)
+                row.addView(cell, params)
+                cell.visibility = View.INVISIBLE
+                carCells.add(Triple(cell, label, value))
+            }
+        }
+    }
+
+    /** Redraws the Car page a few times a second while it is the one showing. */
+    private val carTick = object : Runnable {
+        override fun run() {
+            if (page == 2) renderCar()
+            ui.postDelayed(this, 300)
+        }
+    }
+
+    private fun renderCar() {
+        val name = Obd.deviceName
+        when (Obd.state) {
+            Obd.NO_BLUETOOTH -> setStatus(carStatus, getString(R.string.car_no_bluetooth), R.color.bad)
+            Obd.NO_DEVICE -> setStatus(carStatus, getString(R.string.car_no_device), R.color.accent)
+            Obd.CONNECTING -> setStatus(carStatus, getString(R.string.car_connecting, name), R.color.idle)
+            Obd.CONNECTED -> setStatus(carStatus, getString(R.string.car_connected, name), R.color.ok)
+            else -> setStatus(carStatus, getString(R.string.car_failed, name), R.color.bad)
+        }
+        carGauge.value = Obd.rpm
+        carSpeed.text = Obd.speed?.toString() ?: "–"
+
+        // Label, value, colour: only what the car actually reports.
+        val text = getColor(R.color.text)
+        val warn = Options.ACCENTS[0]
+        val bad = getColor(R.color.bad)
+        val rows = ArrayList<Triple<String, String, Int>>()
+        Obd.coolant?.let {
+            rows.add(Triple(getString(R.string.car_coolant), getString(R.string.car_degrees, it), if (it >= 118) bad else if (it >= 110) warn else text))
+        }
+        Obd.trans?.let {
+            rows.add(Triple(getString(R.string.car_trans), getString(R.string.car_degrees, it), if (it >= 125) bad else if (it >= 110) warn else text))
+        }
+        Obd.volts?.let {
+            val shown = String.format(Locale.US, "%.1f", it)
+            rows.add(Triple(getString(R.string.car_battery), getString(R.string.car_volts, shown), if (it < 11.8f || it > 15.2f) bad else if (it < 12.3f) warn else text))
+        }
+        Obd.fuel?.let {
+            rows.add(Triple(getString(R.string.car_fuel), getString(R.string.car_percent, it), if (it <= 8) bad else if (it <= 15) warn else text))
+        }
+        Obd.intake?.let { rows.add(Triple(getString(R.string.car_intake), getString(R.string.car_degrees, it), text)) }
+        Obd.load?.let { rows.add(Triple(getString(R.string.car_load), getString(R.string.car_percent, it), text)) }
+        for (i in carCells.indices) {
+            val cell = carCells[i]
+            val row = rows.getOrNull(i)
+            cell.first.visibility = if (row == null) View.INVISIBLE else View.VISIBLE
+            if (row != null) {
+                cell.second.text = row.first
+                cell.third.text = row.second
+                cell.third.setTextColor(row.third)
+            }
+        }
+
+        val codes = Obd.codes
+        val checked = DateFormat.getTimeFormat(this).format(Date(Obd.codesAt))
+        if (codes == null) {
+            carCodes.setText(R.string.car_codes_wait)
+            carCodes.setTextColor(getColor(R.color.text_dim))
+        } else if (codes.isEmpty()) {
+            carCodes.text = getString(R.string.car_codes_none, checked)
+            carCodes.setTextColor(getColor(R.color.ok))
+        } else {
+            carCodes.text = getString(R.string.car_codes_some, codes.joinToString("\n"), checked)
+            carCodes.setTextColor(bad)
+        }
+        carClear.visibility = if (codes.isNullOrEmpty()) View.GONE else View.VISIBLE
+    }
+
+    /** Which paired Bluetooth device is the dongle. "Automatic" takes the one with OBD in its name. */
+    private fun chooseDongle() {
+        val paired = Obd.paired()
+        if (paired.isNullOrEmpty()) {
+            Toast.makeText(this, if (paired == null) R.string.car_no_bluetooth else R.string.obd_none_paired, Toast.LENGTH_LONG).show()
+            open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS), getString(R.string.app_name))
+            return
+        }
+        val saved = prefs.getString(Obd.PREF_MAC, "") ?: ""
+        val names = arrayOf(getString(R.string.obd_auto)) + paired.map { it.first }
+        val current = paired.indexOfFirst { it.second == saved } + 1
+        choose(R.string.obd_pick, names, current) {
+            prefs.edit().putString(Obd.PREF_MAC, if (it == 0) "" else paired[it - 1].second).apply()
+            Obd.reconnect()
+        }
+    }
+
     // ---------------------------------------------------------------- settings
 
     /** A list to pick one of; [current] is ticked. */
@@ -867,7 +1014,8 @@ class MainActivity : Activity() {
             getString(R.string.set_prayer, onOff(prayerOn)),
             getString(R.string.set_lang, langNames[lang]),
             getString(R.string.set_media, if (hasMediaAccess()) onOff(true) else getString(R.string.media_need)),
-            getString(R.string.set_keys, if (KeysService.instance != null) onOff(true) else getString(R.string.keys_need))
+            getString(R.string.set_keys, if (KeysService.instance != null) onOff(true) else getString(R.string.keys_need)),
+            getString(R.string.set_obd, Obd.deviceName.ifEmpty { getString(R.string.obd_auto) })
         )
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
@@ -921,6 +1069,7 @@ class MainActivity : Activity() {
                         open(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS), getString(R.string.app_name))
                     }
                     9 -> open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), getString(R.string.app_name))
+                    10 -> chooseDongle()
                 }
             }
             .show()
@@ -982,6 +1131,19 @@ class MainActivity : Activity() {
         px(npTitle, 3.8f)
         px(npArtist, 3.2f)
         px(trip, 3.4f)
+
+        px(carStatus, 3.4f)
+        px(carSpeed, 13f)
+        px(findViewById(R.id.carSpeedUnit), 3.8f)
+        px(findViewById(R.id.carSpeedNote), 3f)
+        px(findViewById(R.id.carCodesTitle), 3.4f)
+        px(carCodes, 4.2f)
+        px(findViewById(R.id.carCheck), 3.6f)
+        px(carClear, 3.6f)
+        for (cell in carCells) {
+            px(cell.second, 3.4f)
+            px(cell.third, 8.4f)
+        }
 
         px(findViewById(R.id.compassTitle), 3.4f)
         px(coords, 3.4f)

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Third page: the car's own figures from an OBD dongle, and its fault codes -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/page3"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    android:padding="14dp"
+    android:visibility="invisible">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_margin="6dp"
+        android:layout_weight="30"
+        android:background="@drawable/card_bg"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <!-- Connection state. Tap to choose the dongle. -->
+        <TextView
+            android:id="@+id/carStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:drawableStart="@drawable/dot"
+            android:drawablePadding="8dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textColor="@color/text_dim" />
+
+        <cloud.ammarhussein.masar.GaugeView
+            android:id="@+id/carGauge"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="bottom"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/carSpeed"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-light"
+                android:includeFontPadding="false"
+                android:text="–"
+                android:textColor="@color/text" />
+
+            <TextView
+                android:id="@+id/carSpeedUnit"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_marginBottom="4dp"
+                android:text="@string/unit_kmh"
+                android:textColor="@color/text_dim" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/carSpeedNote"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/car_speed_note"
+            android:textColor="@color/idle" />
+    </LinearLayout>
+
+    <!-- Readings: up to six cells, filled in code with whatever the car reports -->
+    <LinearLayout
+        android:id="@+id/carGrid"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="40"
+        android:orientation="vertical" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_margin="6dp"
+        android:layout_weight="30"
+        android:background="@drawable/card_bg"
+        android:orientation="vertical"
+        android:padding="14dp">
+
+        <TextView
+            android:id="@+id/carCodesTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="@string/car_codes_title"
+            android:textColor="@color/text_dim" />
+
+        <TextView
+            android:id="@+id/carCodes"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_weight="1"
+            android:lineSpacingMultiplier="1.2"
+            android:textColor="@color/text" />
+
+        <TextView
+            android:id="@+id/carCheck"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/tile_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="@string/car_check"
+            android:textColor="@color/text" />
+
+        <TextView
+            android:id="@+id/carClear"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/tile_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="@string/car_clear"
+            android:textColor="@color/bad"
+            android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>
