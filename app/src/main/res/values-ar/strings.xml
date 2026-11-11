@@ -146,6 +146,7 @@
     <string name="car_clear_ask">مسح أكواد الأعطال المخزنة؟ سيطفئ هذا أيضاً لمبة المحرك. العطل الحقيقي سيعود.</string>
     <string name="set_obd">قطعة OBD: %1$s</string>
     <string name="obd_auto">تلقائي</string>
+    <string name="obd_pair_new">اقتران بجهاز جديد…</string>
     <string name="obd_pick">اختر قطعة OBD</string>
     <string name="obd_none_paired">اقرن القطعة أولاً من إعدادات البلوتوث في الجهاز (الرمز 1234 أو 0000)</string>
 </resources>

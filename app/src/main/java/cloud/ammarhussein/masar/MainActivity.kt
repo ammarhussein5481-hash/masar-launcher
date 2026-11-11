@@ -955,11 +955,15 @@ class MainActivity : Activity() {
             return
         }
         val saved = prefs.getString(Obd.PREF_MAC, "") ?: ""
-        val names = arrayOf(getString(R.string.obd_auto)) + paired.map { it.first }
+        val names = arrayOf(getString(R.string.obd_auto)) + paired.map { it.first } + getString(R.string.obd_pair_new)
         val current = paired.indexOfFirst { it.second == saved } + 1
         choose(R.string.obd_pick, names, current) {
-            prefs.edit().putString(Obd.PREF_MAC, if (it == 0) "" else paired[it - 1].second).apply()
-            Obd.reconnect()
+            if (it == names.size - 1) {
+                open(Intent(Settings.ACTION_BLUETOOTH_SETTINGS), getString(R.string.app_name))
+            } else {
+                prefs.edit().putString(Obd.PREF_MAC, if (it == 0) "" else paired[it - 1].second).apply()
+                Obd.reconnect()
+            }
         }
     }
 

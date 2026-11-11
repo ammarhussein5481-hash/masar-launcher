@@ -152,6 +152,7 @@
     <string name="car_clear_ask">Clear the stored fault codes? This also switches off the check-engine light. A real fault will come back.</string>
     <string name="set_obd">OBD dongle: %1$s</string>
     <string name="obd_auto">Automatic</string>
+    <string name="obd_pair_new">Pair a new device…</string>
     <string name="obd_pick">Choose the OBD dongle</string>
     <string name="obd_none_paired">Pair the dongle in the unit\'s Bluetooth settings first (PIN 1234 or 0000)</string>
 </resources>

@@ -67,8 +67,8 @@ object Obd {
     @Volatile private var socket: BluetoothSocket? = null
     private var thread: Thread? = null
 
-    /** PIDs 0x01 to 0x40 the engine computer says it supports. */
-    private val supported = BooleanArray(0x41)
+    /** PIDs 0x01 to 0x60 the engine computer says it supports. */
+    private val supported = BooleanArray(0x61)
     private var transWorks = false
 
     private val SPP: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
@@ -196,7 +196,7 @@ object Obd {
                 1 -> intake = value(link, 0x0F)?.getOrNull(0)?.minus(40)
                 2 -> load = value(link, 0x04)?.getOrNull(0)?.let { it * 100 / 255 }
                 3 -> fuel = value(link, 0x2F)?.getOrNull(0)?.let { it * 100 / 255 }
-                4 -> volts = Regex("(\\d+\\.\\d+)").find(ask(link, "ATRV", 2000))?.value?.toFloatOrNull()
+                4 -> volts = voltage(link)
                 5 -> if (transWorks) trans = transTemp(link)
             }
             pause(40)
@@ -222,7 +222,19 @@ object Obd {
         if (first == null) throw IOException("The car did not answer")
         mark(first, 0x00)
         if (supported[0x20]) bytes(ask(link, "0120", 3000), "4120")?.let { mark(it, 0x20) }
+        if (supported[0x40]) bytes(ask(link, "0140", 3000), "4140")?.let { mark(it, 0x40) }
         transWorks = transTemp(link) != null
+    }
+
+    /**
+     * System voltage. The engine computer's own figure (PID 42) is the one to
+     * trust; the dongle's built-in voltmeter (ATRV) is only a fallback, because
+     * on cheap dongles it can read a volt or two off.
+     */
+    private fun voltage(link: BluetoothSocket): Float? {
+        val exact = value(link, 0x42)
+        if (exact != null && exact.size >= 2) return (exact[0] * 256 + exact[1]) / 1000f
+        return Regex("(\\d+\\.\\d+)").find(ask(link, "ATRV", 2000))?.value?.toFloatOrNull()
     }
 
     private fun mark(bits: IntArray, base: Int) {
