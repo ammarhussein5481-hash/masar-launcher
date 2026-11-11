@@ -99,36 +99,116 @@
         <TextView
             android:id="@+id/carCodes"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="8dp"
-            android:layout_weight="1"
-            android:lineSpacingMultiplier="1.2"
-            android:textColor="@color/text" />
-
-        <TextView
-            android:id="@+id/carCheck"
-            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/tile_bg"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:padding="10dp"
-            android:text="@string/car_check"
+            android:layout_marginTop="4dp"
+            android:lineSpacingMultiplier="1.15"
+            android:maxLines="5"
             android:textColor="@color/text" />
 
-        <TextView
-            android:id="@+id/carClear"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/tile_bg"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/carCheck"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/tile_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:maxLines="1"
+                android:padding="8dp"
+                android:text="@string/car_check"
+                android:textColor="@color/text" />
+
+            <TextView
+                android:id="@+id/carClear"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@drawable/tile_bg"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:maxLines="1"
+                android:padding="8dp"
+                android:text="@string/car_clear"
+                android:textColor="@color/bad"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/tile_stroke" />
+
+        <!-- This trip. Tap for past trips, long-press to end it. -->
+        <LinearLayout
+            android:id="@+id/carTripBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:clickable="true"
             android:focusable="true"
-            android:gravity="center"
-            android:padding="10dp"
-            android:text="@string/car_clear"
-            android:textColor="@color/bad"
-            android:visibility="gone" />
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/carTripTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="@string/car_trip_title"
+                android:textColor="@color/text_dim" />
+
+            <TextView
+                android:id="@+id/carTrip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:lineSpacingMultiplier="1.15"
+                android:textColor="@color/text" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="8dp"
+            android:background="@color/tile_stroke" />
+
+        <!-- Service reminders. Tap to mark one done. -->
+        <LinearLayout
+            android:id="@+id/carServiceBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/carServiceTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:maxLines="1"
+                android:text="@string/car_service_title"
+                android:textColor="@color/text_dim" />
+
+            <TextView
+                android:id="@+id/carService"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:lineSpacingMultiplier="1.15"
+                android:textColor="@color/text" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

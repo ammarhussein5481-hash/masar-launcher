@@ -60,6 +60,27 @@ object Options {
         return base.createConfigurationContext(config)
     }
 
+    // Fuel. The price is per litre in the local currency; the tank is a 2015 Tahoe's.
+    const val DEFAULT_PRICE = 2.18f
+    fun fuelPrice(prefs: SharedPreferences): Float = prefs.getFloat("fuel_price", DEFAULT_PRICE)
+    fun tankLiters(prefs: SharedPreferences): Float = prefs.getFloat("tank_l", 98f)
+    /** Long-run litres per 100 km, learned from finished trips; a guess until then. */
+    fun averageUse(prefs: SharedPreferences): Double = prefs.getFloat("avg_l100", 16f).toDouble()
+
+    fun autoCarPlay(prefs: SharedPreferences): Boolean = prefs.getBoolean("auto_carplay", false)
+
+    // Service reminders, by distance on Masar's own odometer (Trip.totalMeters).
+    val SERVICES = arrayOf("oil", "rotation", "air")
+    val SERVICE_KM = intArrayOf(8000, 10000, 20000)
+    /** Kilometres left until service [index] is due; negative once it is overdue. */
+    fun serviceLeftKm(prefs: SharedPreferences, index: Int): Int {
+        val doneAt = prefs.getFloat("svc_" + SERVICES[index], 0f).toDouble()
+        return SERVICE_KM[index] - ((Trip.totalMeters - doneAt) / 1000.0).toInt()
+    }
+    fun serviceDone(prefs: SharedPreferences, index: Int) {
+        prefs.edit().putFloat("svc_" + SERVICES[index], Trip.totalMeters.toFloat()).apply()
+    }
+
     /** The last position the unit knew, for prayer times and sunset before the first fix. */
     fun savePosition(prefs: SharedPreferences, lat: Double, lon: Double) {
         prefs.edit().putFloat("last_lat", lat.toFloat()).putFloat("last_lon", lon.toFloat()).apply()

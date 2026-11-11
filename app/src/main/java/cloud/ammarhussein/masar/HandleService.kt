@@ -91,7 +91,7 @@ class HandleService : Service() {
     private var chip: TextView? = null
 
     private var alert: TextView? = null
-    /** Which warning is showing: "", "coolant", "trans", "volts" or "code". */
+    /** Which warning is showing: "", "coolant", "trans", "volts", "tyre" or "code". */
     private var alertKey = ""
     private var voltsOff = 0
     private var codeText = ""
@@ -621,6 +621,12 @@ class HandleService : Service() {
             } else if (voltsOff >= 5 && volts != null) {
                 text = getString(R.string.alert_volts, String.format(Locale.US, "%.1f", volts))
                 key = "volts"
+            } else {
+                val low = Obd.tyres?.minOrNull()
+                if (low != null && low < (if (alertKey == "tyre") TYRE_LOW + 2 else TYRE_LOW)) {
+                    text = getString(R.string.alert_tyre, low)
+                    key = "tyre"
+                }
             }
 
             // A fault code is announced once, for a while, when it first appears.
@@ -746,6 +752,8 @@ class HandleService : Service() {
         private const val TRANS_HOT = 120
         private const val VOLTS_LOW = 12.0f
         private const val VOLTS_HIGH = 15.5f
+        /** psi. The door placard is about 35; this is a properly soft tyre. */
+        private const val TYRE_LOW = 26
         private const val CODE_SHOW_MS = 30_000L
         private const val PREF_CODES_SEEN = "codes_seen"
 

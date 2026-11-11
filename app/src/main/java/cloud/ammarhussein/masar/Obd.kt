@@ -55,6 +55,18 @@ object Obd {
     /** Transmission fluid temperature, read with a GM-specific request. */
     @Volatile var trans: Int? = null
         private set
+    /** Fuel being burned right now, litres per hour, worked out from the air flow. */
+    @Volatile var litersPerHour: Float? = null
+        private set
+    /** The car's own oil life monitor, percent left (GM-specific). */
+    @Volatile var oilLife: Int? = null
+        private set
+    /** Tyre pressures in psi: front left, front right, rear right, rear left (GM-specific). */
+    @Volatile var tyres: IntArray? = null
+        private set
+    /** What the car answered to each GM-specific request at connection, for the report in settings. */
+    @Volatile var report = ""
+        private set
 
     /** Stored fault codes ("P0420"), or null until they have been read. */
     @Volatile var codes: List<String>? = null
@@ -71,6 +83,9 @@ object Obd {
     /** PIDs 0x01 to 0x60 the engine computer says it supports. */
     private val supported = BooleanArray(0x61)
     private var transWorks = false
+    private var oilWorks = 0
+    private var tyresWork = 0
+    private var mafAt = 0L
     private var failures = 0
     private const val CODES_EVERY_MS = 120_000L
 
@@ -192,10 +207,16 @@ object Obd {
                     codesAt = System.currentTimeMillis()
                 }
                 rpm = value(link, 0x0C)?.let { if (it.size >= 2) (it[0] * 256 + it[1]) / 4 else null }
-                coolant = value(link, 0x05)?.getOrNull(0)?.minus(40)
-                volts = voltage(link)
-                if (transWorks) trans = transTemp(link)
-                pause(4000)
+                speed = value(link, 0x0D)?.getOrNull(0)
+                fuelFlow(link)
+                // The rest take turns, so the fuel count is sampled every two seconds.
+                when (turn++ % 4) {
+                    0 -> coolant = value(link, 0x05)?.getOrNull(0)?.minus(40)
+                    1 -> volts = voltage(link)
+                    2 -> if (transWorks) trans = transTemp(link)
+                    3 -> if (turn % 40 == 3) extras(link)
+                }
+                pause(2000)
                 continue
             }
             if (wantClear) {
@@ -211,6 +232,8 @@ object Obd {
             // RPM and speed every round; the slow-moving values take turns.
             rpm = value(link, 0x0C)?.let { if (it.size >= 2) (it[0] * 256 + it[1]) / 4 else null }
             speed = value(link, 0x0D)?.getOrNull(0)
+            fuelFlow(link)
+            if (turn % 120 == 60) extras(link)
             when (turn++ % 6) {
                 0 -> coolant = value(link, 0x05)?.getOrNull(0)?.minus(40)
                 1 -> intake = value(link, 0x0F)?.getOrNull(0)?.minus(40)
@@ -254,7 +277,102 @@ object Obd {
         if (supported[0x20]) for (bits in allBytes(ask(link, "0120", 3000), "4120")) mark(bits, 0x20)
         if (supported[0x40]) for (bits in allBytes(ask(link, "0140", 3000), "4140")) mark(bits, 0x40)
         transWorks = transTemp(link) != null
+        probe(link)
+        mafAt = 0L
     }
+
+    /**
+     * Fuel flow from the air the engine is breathing: a petrol engine burns
+     * one part fuel to 14.7 parts air, and a litre of petrol weighs about
+     * 745 g. Good to within roughly a tenth. Each sample is also added to the
+     * trip's fuel total.
+     */
+    private fun fuelFlow(link: BluetoothSocket) {
+        val raw = value(link, 0x10)
+        val now = SystemClock.elapsedRealtime()
+        if (raw == null || raw.size < 2) {
+            litersPerHour = null
+            mafAt = 0L
+            return
+        }
+        val gramsPerSecond = (raw[0] * 256 + raw[1]) / 100.0
+        val litersPerSecond = gramsPerSecond / (14.7 * 745.0)
+        litersPerHour = (litersPerSecond * 3600.0).toFloat()
+        val running = (rpm ?: 0) > 300
+        if (running && mafAt != 0L && now - mafAt < 8000L) Trip.addFuel(litersPerSecond * (now - mafAt) / 1000.0)
+        mafAt = now
+    }
+
+    // ---------------------------------------------------------------- GM extras
+
+    /**
+     * One GM-specific value: request 22 [pid] sent to the computer at [header],
+     * whose answers come from [reply] ("" for the engine and transmission
+     * computers, which the dongle listens to anyway). Returns the data bytes.
+     * The dongle is put back to normal afterwards.
+     */
+    private fun extended(link: BluetoothSocket, header: String, reply: String, pid: String, log: StringBuilder? = null): IntArray? {
+        var out: IntArray? = null
+        try {
+            ask(link, "ATSH$header", 2000)
+            if (reply.isNotEmpty()) ask(link, "ATCRA$reply", 2000)
+            val answer = ask(link, "22$pid", 2500)
+            if (log != null) {
+                log.append(header).append(" 22").append(pid).append(" -> ")
+                    .append(answer.replace('\r', ' ').trim()).append('\n')
+            }
+            out = bytes(answer, "62$pid")
+        } finally {
+            if (reply.isNotEmpty()) ask(link, "ATAR", 2000)
+            ask(link, "ATSH7DF", 2000)
+        }
+        return out
+    }
+
+    /** At connection: finds out which of the GM extras this car answers, and keeps the raw answers. */
+    private fun probe(link: BluetoothSocket) {
+        val log = StringBuilder()
+        oilWorks = 0
+        tyresWork = 0
+        if (extended(link, "7E0", "", "119F", log)?.getOrNull(0)?.let { it in 0..100 } == true) oilWorks = 1
+        else if (extended(link, "7E0", "", "4DC0", log) != null) oilWorks = 2
+        // Tyres: the body computer on newer trucks, the engine computer on older ones.
+        val body = extended(link, "241", "641", "5005", log)
+        if (body != null && body.size >= 2) tyresWork = 1
+        else if (extended(link, "7E0", "", "248E", log)?.getOrNull(0)?.let { it in 1..254 } == true) tyresWork = 2
+        log.append("oil=").append(oilWorks).append(" tyres=").append(tyresWork).append(" trans=").append(transWorks)
+        report = log.toString()
+        extras(link)
+    }
+
+    /** Oil life and tyre pressures: slow-moving, so read only now and then. */
+    private fun extras(link: BluetoothSocket) {
+        when (oilWorks) {
+            1 -> oilLife = extended(link, "7E0", "", "119F")?.getOrNull(0)?.takeIf { it in 0..100 }
+            2 -> oilLife = extended(link, "7E0", "", "4DC0")?.getOrNull(0)?.let { it * 100 / 255 }
+        }
+        if (tyresWork == 0) return
+        val psi = IntArray(4)
+        for (i in 0 until 4) {
+            val reading = if (tyresWork == 1) {
+                // Sixteenths of a kilopascal.
+                extended(link, "241", "641", TYRE_BODY[i])?.let { if (it.size >= 2) ((it[0] * 256 + it[1]) / 16.0 * 0.145038).toInt() else null }
+            } else {
+                extended(link, "7E0", "", TYRE_ENGINE[i])?.getOrNull(0)
+            }
+            // No sensor signal yet reads as zero or full scale.
+            if (reading == null || reading <= 0 || reading >= 120) {
+                tyres = null
+                return
+            }
+            psi[i] = reading
+        }
+        tyres = psi
+    }
+
+    // Front left, front right, rear right, rear left.
+    private val TYRE_BODY = arrayOf("5005", "5006", "5007", "5008")
+    private val TYRE_ENGINE = arrayOf("248E", "248F", "2490", "2491")
 
     /**
      * System voltage. The engine computer's own figure (PID 42) is the one to
@@ -398,6 +516,9 @@ object Obd {
         fuel = null
         volts = null
         trans = null
+        litersPerHour = null
+        oilLife = null
+        tyres = null
     }
 
     private fun close() {

@@ -160,4 +160,33 @@
     <string name="alert_trans">Transmission hot · %1$d°C</string>
     <string name="alert_volts">Check charging · %1$s V</string>
     <string name="alert_fault">Fault code · %1$s</string>
+    <string name="alert_tyre">Tyre low · %1$d psi</string>
+    <string name="car_trip_title">This trip</string>
+    <string name="car_trip">%1$s km · %2$s\nAvg %3$d · Max %4$d km/h</string>
+    <string name="car_trip_fuel">%1$s L · %2$s L/100 km · %3$s %4$s</string>
+    <string name="currency">SAR</string>
+    <string name="car_use">Fuel use</string>
+    <string name="car_use_100">%1$s L/100</string>
+    <string name="car_use_hour">%1$s L/h</string>
+    <string name="car_fuel_range">Fuel · about %1$d km</string>
+    <string name="car_tyres">Tyres (psi)</string>
+    <string name="car_service_title">Service</string>
+    <string name="svc_oil_life">Oil life %1$d%%</string>
+    <string-array name="services">
+        <item>Oil change</item><item>Tyre rotation</item><item>Air filter</item>
+    </string-array>
+    <string name="svc_left">%1$s in %2$s km</string>
+    <string name="svc_due">%1$s due</string>
+    <string name="svc_pick">Which service was done?</string>
+    <string name="svc_done">%1$s: done now</string>
+    <string name="history_title">Past trips</string>
+    <string name="history_empty">No finished trips yet. A trip is filed after the car has been parked for 30 minutes.</string>
+    <string name="history_line">%1$s · %2$s km · %3$s</string>
+    <string name="history_fuel"> · %1$s L · %2$s %3$s</string>
+    <string name="trip_end">End this trip and file it?</string>
+    <string name="set_price">Petrol price: %1$s %2$s per litre</string>
+    <string name="price_title">Petrol price per litre</string>
+    <string name="set_autoplay">Open CarPlay by itself: %1$s</string>
+    <string name="set_report">OBD report</string>
+    <string name="report_empty">Nothing yet: the dongle has not connected in this session.</string>
 </resources>

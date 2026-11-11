@@ -104,6 +104,8 @@ class MainActivity : Activity() {
     private lateinit var carSpeed: TextView
     private lateinit var carCodes: TextView
     private lateinit var carClear: TextView
+    private lateinit var carTrip: TextView
+    private lateinit var carService: TextView
     private lateinit var carStrip: View
     private lateinit var stripCoolant: TextView
     private lateinit var stripTrans: TextView
@@ -138,6 +140,7 @@ class MainActivity : Activity() {
     private lateinit var compass8: Array<String>
 
     private var controller: MediaController? = null
+    private var phoneListening = false
     private var mediaListening = false
 
     private var prayerDay: PrayerTimes.Day? = null
@@ -214,6 +217,15 @@ class MainActivity : Activity() {
         carSpeed = findViewById(R.id.carSpeed)
         carCodes = findViewById(R.id.carCodes)
         carClear = findViewById(R.id.carClear)
+        carTrip = findViewById(R.id.carTrip)
+        carService = findViewById(R.id.carService)
+        val tripBox = findViewById<View>(R.id.carTripBox)
+        tripBox.setOnClickListener { historyDialog() }
+        tripBox.setOnLongClickListener {
+            endTripDialog()
+            true
+        }
+        findViewById<View>(R.id.carServiceBox).setOnClickListener { serviceDialog() }
         carStrip = findViewById(R.id.carStrip)
         stripCoolant = findViewById(R.id.stripCoolant)
         stripTrans = findViewById(R.id.stripTrans)
@@ -256,15 +268,9 @@ class MainActivity : Activity() {
             true
         }
         prayer.setOnClickListener { prayerDialog() }
+        trip.setOnClickListener { historyDialog() }
         trip.setOnLongClickListener {
-            AlertDialog.Builder(this)
-                .setMessage(R.string.trip_reset)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    Trip.reset(prefs)
-                    renderTrip()
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            endTripDialog()
             true
         }
         findViewById<View>(R.id.npPrev).setOnClickListener { controller?.transportControls?.skipToPrevious() }
@@ -357,6 +363,12 @@ class MainActivity : Activity() {
         }
         startMedia()
         Obd.start(this)
+        try {
+            registerReceiver(phoneReceiver, IntentFilter(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED))
+            phoneListening = true
+        } catch (ex: Exception) {
+            // No Bluetooth on this unit
+        }
         ui.removeCallbacks(carTick)
         ui.post(carTick)
         ui.removeCallbacks(staleCheck)
@@ -368,6 +380,32 @@ class MainActivity : Activity() {
         super.onResume()
         syncHandle()
         updateHandleStatus()
+        // Once per start of the unit, if asked to: go straight to CarPlay.
+        if (!autoOpened) {
+            autoOpened = true
+            if (Options.autoCarPlay(prefs)) ui.postDelayed({ openCarPlay() }, 2500)
+        }
+    }
+
+    /** Opens the CarPlay dongle app, but only from Masar's own screen: never over another app. */
+    private fun openCarPlay() {
+        if (!HandleService.homeVisible || !Options.autoCarPlay(prefs)) return
+        val launcher = packageManager.getLaunchIntentForPackage(AUTOKIT) ?: return
+        open(launcher, getString(R.string.carplay))
+    }
+
+    /** A phone (anything but the OBD dongle) connecting over Bluetooth is the cue to open CarPlay. */
+    private val phoneReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val device = intent.getParcelableExtra<android.bluetooth.BluetoothDevice>(android.bluetooth.BluetoothDevice.EXTRA_DEVICE)
+            val name = try {
+                device?.name ?: ""
+            } catch (ex: SecurityException) {
+                ""
+            }
+            if (name.contains("OBD", ignoreCase = true) || name == Obd.deviceName) return
+            ui.postDelayed({ openCarPlay() }, 1500)
+        }
     }
 
     override fun onStop() {
@@ -376,6 +414,14 @@ class MainActivity : Activity() {
         stopGps()
         stopMedia()
         ui.removeCallbacks(carTick)
+        if (phoneListening) {
+            phoneListening = false
+            try {
+                unregisterReceiver(phoneReceiver)
+            } catch (ex: Exception) {
+                // Already gone
+            }
+        }
         if (netRegistered) {
             try {
                 val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -733,6 +779,115 @@ class MainActivity : Activity() {
         )
     }
 
+    private fun km(meters: Double): String = String.format(Locale.US, "%.1f", meters / 1000.0)
+
+    private fun hoursMinutes(ms: Long): String {
+        val minutes = (ms / 60_000L).toInt()
+        return String.format(Locale.US, "%d:%02d", minutes / 60, minutes % 60)
+    }
+
+    private fun money(liters: Double): String = String.format(Locale.US, "%.2f", liters * Options.fuelPrice(prefs))
+
+    /** The trip block on the Car page: the Drive page's two lines, plus fuel and cost once the dongle has counted some. */
+    private fun renderCarTrip() {
+        val text = StringBuilder(
+            getString(R.string.car_trip, km(Trip.meters), hoursMinutes(Trip.movingMs), Trip.averageKmh(), Trip.topKmh)
+        )
+        if (Trip.liters > 0.01) {
+            val per100 = Trip.per100()?.let { String.format(Locale.US, "%.1f", it) } ?: "–"
+            text.append('\n').append(
+                getString(
+                    R.string.car_trip_fuel,
+                    String.format(Locale.US, "%.1f", Trip.liters), per100,
+                    money(Trip.liters), getString(R.string.currency)
+                )
+            )
+        }
+        if (carTrip.text.toString() != text.toString()) carTrip.text = text
+    }
+
+    private fun endTripDialog() {
+        AlertDialog.Builder(this)
+            .setMessage(R.string.trip_end)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                Trip.reset(prefs)
+                renderTrip()
+                renderCarTrip()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Finished trips, newest first. */
+    private fun historyDialog() {
+        val past = Trip.history(prefs)
+        val builder = AlertDialog.Builder(this).setTitle(R.string.history_title)
+        if (past.isEmpty()) {
+            builder.setMessage(R.string.history_empty)
+        } else {
+            val day = SimpleDateFormat("d MMM", Locale.getDefault())
+            val time = DateFormat.getTimeFormat(this)
+            val lines = Array(past.size) { i ->
+                val trip = past[i]
+                val started = Date(trip.start)
+                var line = getString(
+                    R.string.history_line,
+                    day.format(started) + " " + time.format(started), km(trip.meters), hoursMinutes(trip.movingMs)
+                )
+                if (trip.liters > 0.01) {
+                    line += getString(
+                        R.string.history_fuel,
+                        String.format(Locale.US, "%.1f", trip.liters), money(trip.liters), getString(R.string.currency)
+                    )
+                }
+                line
+            }
+            builder.setItems(lines, null)
+        }
+        builder.setPositiveButton(R.string.close, null).show()
+    }
+
+    // ---------------------------------------------------------------- service
+
+    /** Oil life from the car if it reports it, then the reminders Masar counts by distance. */
+    private fun renderService() {
+        val names = resources.getStringArray(R.array.services)
+        val text = StringBuilder()
+        var due = false
+        val oil = Obd.oilLife
+        if (oil != null) {
+            text.append(getString(R.string.svc_oil_life, oil))
+            if (oil <= 10) due = true
+        }
+        for (i in names.indices) {
+            // The car's own oil monitor replaces the distance count for oil.
+            if (i == 0 && oil != null) continue
+            val left = Options.serviceLeftKm(prefs, i)
+            if (text.isNotEmpty()) text.append('\n')
+            if (left <= 0) {
+                text.append(getString(R.string.svc_due, names[i]))
+                due = true
+            } else {
+                text.append(getString(R.string.svc_left, names[i], String.format(Locale.US, "%,d", left)))
+            }
+        }
+        if (carService.text.toString() != text.toString()) carService.text = text
+        carService.setTextColor(getColor(if (due) R.color.bad else R.color.text))
+    }
+
+    private fun serviceDialog() {
+        val names = resources.getStringArray(R.array.services)
+        val items = Array(names.size) { getString(R.string.svc_done, names[it]) }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.svc_pick)
+            .setItems(items) { _, which ->
+                Options.serviceDone(prefs, which)
+                renderService()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
     // ---------------------------------------------------------------- now playing
 
     private fun hasMediaAccess(): Boolean {
@@ -877,7 +1032,7 @@ class MainActivity : Activity() {
                 val value = TextView(this)
                 value.typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.NORMAL)
                 value.includeFontPadding = false
-                value.maxLines = 1
+                value.maxLines = 2
                 cell.addView(label)
                 cell.addView(value)
                 val params = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
@@ -939,36 +1094,58 @@ class MainActivity : Activity() {
         carGauge.value = Obd.rpm
         carSpeed.text = Obd.speed?.toString() ?: "–"
 
-        // Label, value, colour: only what the car actually reports.
+        // Only what the car actually reports, most useful first; the first six get a cell.
         val text = getColor(R.color.text)
         val warn = Options.ACCENTS[0]
         val bad = getColor(R.color.bad)
-        val rows = ArrayList<Triple<String, String, Int>>()
+        class Row(val label: String, val value: String, val color: Int, val small: Boolean = false)
+        val rows = ArrayList<Row>()
         Obd.coolant?.let {
-            rows.add(Triple(getString(R.string.car_coolant), getString(R.string.car_degrees, it), if (it >= 113) bad else if (it >= 108) warn else text))
+            rows.add(Row(getString(R.string.car_coolant), getString(R.string.car_degrees, it), if (it >= 113) bad else if (it >= 108) warn else text))
         }
         Obd.trans?.let {
-            rows.add(Triple(getString(R.string.car_trans), getString(R.string.car_degrees, it), if (it >= 120) bad else if (it >= 110) warn else text))
+            rows.add(Row(getString(R.string.car_trans), getString(R.string.car_degrees, it), if (it >= 120) bad else if (it >= 110) warn else text))
         }
         Obd.volts?.let {
             val shown = String.format(Locale.US, "%.1f", it)
-            rows.add(Triple(getString(R.string.car_battery), getString(R.string.car_volts, shown), if (it < 11.8f || it > 15.2f) bad else if (it < 12.3f) warn else text))
+            rows.add(Row(getString(R.string.car_battery), getString(R.string.car_volts, shown), if (it < 11.8f || it > 15.2f) bad else if (it < 12.3f) warn else text))
         }
         Obd.fuel?.let {
-            rows.add(Triple(getString(R.string.car_fuel), getString(R.string.car_percent, it), if (it <= 8) bad else if (it <= 15) warn else text))
+            // What is left in the tank at the long-run rate of use.
+            val range = (Options.tankLiters(prefs) * it / 100.0 / Options.averageUse(prefs) * 100.0).roundToInt()
+            rows.add(Row(getString(R.string.car_fuel_range, range), getString(R.string.car_percent, it), if (it <= 8) bad else if (it <= 15) warn else text))
         }
-        Obd.intake?.let { rows.add(Triple(getString(R.string.car_intake), getString(R.string.car_degrees, it), text)) }
-        Obd.load?.let { rows.add(Triple(getString(R.string.car_load), getString(R.string.car_percent, it), text)) }
+        Obd.litersPerHour?.let {
+            // Per distance on the move, per hour at a standstill.
+            val speed = Obd.speed ?: 0
+            val shown = if (speed >= 10) {
+                getString(R.string.car_use_100, String.format(Locale.US, "%.1f", min(it / speed * 100f, 99.9f)))
+            } else {
+                getString(R.string.car_use_hour, String.format(Locale.US, "%.1f", it))
+            }
+            rows.add(Row(getString(R.string.car_use), shown, text, small = true))
+        }
+        Obd.tyres?.let {
+            // As the car sits: front pair on top, rear pair below.
+            val low = it.minOrNull() ?: 0
+            rows.add(Row(getString(R.string.car_tyres), "${it[0]}  ${it[1]}\n${it[3]}  ${it[2]}", if (low < 26) bad else if (low < 30) warn else text, small = true))
+        }
+        Obd.intake?.let { rows.add(Row(getString(R.string.car_intake), getString(R.string.car_degrees, it), text)) }
+        Obd.load?.let { rows.add(Row(getString(R.string.car_load), getString(R.string.car_percent, it), text)) }
         for (i in carCells.indices) {
             val cell = carCells[i]
             val row = rows.getOrNull(i)
             cell.first.visibility = if (row == null) View.INVISIBLE else View.VISIBLE
             if (row != null) {
-                cell.second.text = row.first
-                cell.third.text = row.second
-                cell.third.setTextColor(row.third)
+                if (cell.second.text.toString() != row.label) cell.second.text = row.label
+                if (cell.third.text.toString() != row.value) cell.third.text = row.value
+                cell.third.setTextColor(row.color)
+                cell.third.maxLines = 2
+                cell.third.setTextSize(TypedValue.COMPLEX_UNIT_PX, u * (if (row.small) 5.6f else 8.4f))
             }
         }
+        renderCarTrip()
+        renderService()
 
         val codes = Obd.codes
         val checked = DateFormat.getTimeFormat(this).format(Date(Obd.codesAt))
@@ -979,7 +1156,11 @@ class MainActivity : Activity() {
             carCodes.text = getString(R.string.car_codes_none, checked)
             carCodes.setTextColor(getColor(R.color.ok))
         } else {
-            carCodes.text = getString(R.string.car_codes_some, codes.joinToString("\n"), checked)
+            val named = codes.joinToString("\n") { code ->
+                val what = Dtc.describe(code)
+                if (what.isEmpty()) code else "$code · $what"
+            }
+            carCodes.text = getString(R.string.car_codes_some, named, checked)
             carCodes.setTextColor(bad)
         }
         carClear.visibility = if (codes.isNullOrEmpty()) View.GONE else View.VISIBLE
@@ -1058,7 +1239,10 @@ class MainActivity : Activity() {
             getString(R.string.set_lang, langNames[lang]),
             getString(R.string.set_media, if (hasMediaAccess()) onOff(true) else getString(R.string.media_need)),
             getString(R.string.set_keys, if (KeysService.instance != null) onOff(true) else getString(R.string.keys_need)),
-            getString(R.string.set_obd, Obd.deviceName.ifEmpty { getString(R.string.obd_auto) })
+            getString(R.string.set_obd, Obd.deviceName.ifEmpty { getString(R.string.obd_auto) }),
+            getString(R.string.set_price, String.format(Locale.US, "%.2f", Options.fuelPrice(prefs)), getString(R.string.currency)),
+            getString(R.string.set_autoplay, onOff(Options.autoCarPlay(prefs))),
+            getString(R.string.set_report)
         )
         AlertDialog.Builder(this)
             .setTitle(R.string.settings_title)
@@ -1113,8 +1297,32 @@ class MainActivity : Activity() {
                     }
                     9 -> open(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), getString(R.string.app_name))
                     10 -> chooseDongle()
+                    11 -> priceDialog()
+                    12 -> prefs.edit().putBoolean("auto_carplay", !Options.autoCarPlay(prefs)).apply()
+                    13 -> AlertDialog.Builder(this)
+                        .setTitle(R.string.set_report)
+                        .setMessage(Obd.report.ifEmpty { getString(R.string.report_empty) })
+                        .setPositiveButton(R.string.close, null)
+                        .show()
                 }
             }
+            .show()
+    }
+
+    /** Petrol price per litre, typed in; it turns litres into money on the trip lines. */
+    private fun priceDialog() {
+        val input = android.widget.EditText(this)
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+        input.setText(String.format(Locale.US, "%.2f", Options.fuelPrice(prefs)))
+        input.selectAll()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.price_title)
+            .setView(input)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val price = input.text.toString().replace(',', '.').toFloatOrNull()
+                if (price != null && price > 0f && price < 100f) prefs.edit().putFloat("fuel_price", price).apply()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
             .show()
     }
 
@@ -1183,9 +1391,13 @@ class MainActivity : Activity() {
         px(findViewById(R.id.carSpeedUnit), 3.8f)
         px(findViewById(R.id.carSpeedNote), 3f)
         px(findViewById(R.id.carCodesTitle), 3.4f)
-        px(carCodes, 4.2f)
-        px(findViewById(R.id.carCheck), 3.6f)
-        px(carClear, 3.6f)
+        px(carCodes, 3.6f)
+        px(findViewById(R.id.carTripTitle), 3.4f)
+        px(carTrip, 3.4f)
+        px(findViewById(R.id.carServiceTitle), 3.4f)
+        px(carService, 3.4f)
+        px(findViewById(R.id.carCheck), 3.2f)
+        px(carClear, 3.2f)
         for (cell in carCells) {
             px(cell.second, 3.4f)
             px(cell.third, 8.4f)
@@ -1793,6 +2005,8 @@ class MainActivity : Activity() {
         private const val WEATHER_MOVE_M = 25_000f
 
         private const val REQUEST_PHOTO = 2
+        /** True once CarPlay has been opened automatically in this run of the unit. */
+        private var autoOpened = false
         private const val WALLPAPER_FILE = "wallpaper.jpg"
         /** How dark the night veil is: enough to stop the glare, not enough to hide the tiles. */
         private const val NIGHT_ALPHA = 0.38f

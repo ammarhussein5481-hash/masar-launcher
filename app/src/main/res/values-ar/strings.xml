@@ -154,4 +154,33 @@
     <string name="alert_trans">حرارة القير مرتفعة · %1$d°م</string>
     <string name="alert_volts">افحص الشحن · %1$s فولت</string>
     <string name="alert_fault">كود عطل · %1$s</string>
+    <string name="alert_tyre">ضغط الإطار منخفض · %1$d psi</string>
+    <string name="car_trip_title">هذه الرحلة</string>
+    <string name="car_trip">%1$s كم · %2$s\nالمتوسط %3$d · الأقصى %4$d كم/س</string>
+    <string name="car_trip_fuel">%1$s لتر · %2$s لتر/100 كم · %3$s %4$s</string>
+    <string name="currency">ريال</string>
+    <string name="car_use">استهلاك الوقود</string>
+    <string name="car_use_100">%1$s لتر/100</string>
+    <string name="car_use_hour">%1$s لتر/س</string>
+    <string name="car_fuel_range">الوقود · نحو %1$d كم</string>
+    <string name="car_tyres">الإطارات (psi)</string>
+    <string name="car_service_title">الصيانة</string>
+    <string name="svc_oil_life">عمر الزيت %1$d%%</string>
+    <string-array name="services">
+        <item>تغيير الزيت</item><item>تدوير الإطارات</item><item>فلتر الهواء</item>
+    </string-array>
+    <string name="svc_left">%1$s بعد %2$s كم</string>
+    <string name="svc_due">%1$s مستحق</string>
+    <string name="svc_pick">أي صيانة تمت؟</string>
+    <string name="svc_done">%1$s: تمت الآن</string>
+    <string name="history_title">الرحلات السابقة</string>
+    <string name="history_empty">لا توجد رحلات منتهية بعد. تُحفظ الرحلة بعد توقف السيارة 30 دقيقة.</string>
+    <string name="history_line">%1$s · %2$s كم · %3$s</string>
+    <string name="history_fuel"> · %1$s لتر · %2$s %3$s</string>
+    <string name="trip_end">إنهاء هذه الرحلة وحفظها؟</string>
+    <string name="set_price">سعر البنزين: %1$s %2$s للتر</string>
+    <string name="price_title">سعر لتر البنزين</string>
+    <string name="set_autoplay">فتح كاربلاي تلقائياً: %1$s</string>
+    <string name="set_report">تقرير OBD</string>
+    <string name="report_empty">لا شيء بعد: القطعة لم تتصل في هذه الجلسة.</string>
 </resources>
