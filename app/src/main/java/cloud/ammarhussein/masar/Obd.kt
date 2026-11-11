@@ -197,7 +197,14 @@ object Obd {
                 2 -> load = value(link, 0x04)?.getOrNull(0)?.let { it * 100 / 255 }
                 3 -> fuel = value(link, 0x2F)?.getOrNull(0)?.let { it * 100 / 255 }
                 4 -> volts = voltage(link)
-                5 -> if (transWorks) trans = transTemp(link)
+                5 -> {
+                    // The transmission computer sleeps with the key off, so a
+                    // failed first try is repeated now and then.
+                    if (transWorks || turn % 60 == 0) {
+                        trans = transTemp(link)
+                        if (trans != null) transWorks = true
+                    }
+                }
             }
             pause(40)
         }
@@ -235,8 +242,12 @@ object Obd {
      * on cheap dongles it can read a volt or two off.
      */
     private fun voltage(link: BluetoothSocket): Float? {
-        val exact = value(link, 0x42)
-        if (exact != null && exact.size >= 2) return (exact[0] * 256 + exact[1]) / 1000f
+        if (supported[0x42]) {
+            val exact = value(link, 0x42)
+            val volts = if (exact != null && exact.size >= 2) (exact[0] * 256 + exact[1]) / 1000f else 0f
+            // With the key off the computer reports zero: show nothing rather than "0.0 V".
+            return if (volts in 6f..20f) volts else null
+        }
         return Regex("(\\d+\\.\\d+)").find(ask(link, "ATRV", 2000))?.value?.toFloatOrNull()
     }
 
