@@ -822,12 +822,22 @@ class MainActivity : Activity() {
     private fun historyDialog() {
         val past = Trip.history(prefs)
         val builder = AlertDialog.Builder(this).setTitle(R.string.history_title)
-        if (past.isEmpty()) {
+        val day = SimpleDateFormat("d MMM", Locale.getDefault())
+        val time = DateFormat.getTimeFormat(this)
+        // First line: where the car was last seen, which is where it is parked.
+        val parked = if (Trip.lastSeen != 0L && (Trip.lastLat != 0.0 || Trip.lastLon != 0.0)) {
+            val seen = Date(Trip.lastSeen)
+            getString(R.string.parked_line, day.format(seen) + " " + time.format(seen))
+        } else {
+            null
+        }
+        if (past.isEmpty() && parked == null) {
             builder.setMessage(R.string.history_empty)
         } else {
-            val day = SimpleDateFormat("d MMM", Locale.getDefault())
-            val time = DateFormat.getTimeFormat(this)
-            val lines = Array(past.size) { i ->
+            val offset = if (parked == null) 0 else 1
+            val lines = Array(past.size + offset) { row ->
+                if (row < offset) return@Array parked ?: ""
+                val i = row - offset
                 val trip = past[i]
                 val started = Date(trip.start)
                 var line = getString(
@@ -842,9 +852,24 @@ class MainActivity : Activity() {
                 }
                 line
             }
-            builder.setItems(lines, null)
+            // A tap shows the place on a map: the parked car, or where that trip ended.
+            builder.setItems(lines) { _, row ->
+                if (row < offset) {
+                    showOnMap(Trip.lastLat, Trip.lastLon)
+                } else {
+                    val trip = past[row - offset]
+                    showOnMap(trip.lat, trip.lon)
+                }
+            }
         }
         builder.setPositiveButton(R.string.close, null).show()
+    }
+
+    private fun showOnMap(lat: Double, lon: Double) {
+        if (lat == 0.0 && lon == 0.0) return
+        val place = String.format(Locale.US, "%.6f,%.6f", lat, lon)
+        val uri = Uri.parse("geo:$place?q=$place")
+        open(Intent(Intent.ACTION_VIEW, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), getString(R.string.map_title))
     }
 
     // ---------------------------------------------------------------- service

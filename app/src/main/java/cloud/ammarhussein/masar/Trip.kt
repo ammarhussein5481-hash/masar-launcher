@@ -42,8 +42,20 @@ object Trip {
     private var lastSaved = 0L
     private var loaded = false
 
-    /** A finished trip, as kept in the history. */
-    class Past(val start: Long, val meters: Double, val movingMs: Long, val topKmh: Int, val liters: Double)
+    /** Where and when the car last was: the last fix before the unit lost power. 0, 0 until known. */
+    var lastLat = 0.0
+        private set
+    var lastLon = 0.0
+        private set
+    var lastSeen = 0L
+        private set
+    private var wasMoving = false
+
+    /** A finished trip, as kept in the history. [lat], [lon] is where it ended; 0, 0 if unknown. */
+    class Past(
+        val start: Long, val meters: Double, val movingMs: Long, val topKmh: Int, val liters: Double,
+        val lat: Double, val lon: Double
+    )
 
     @Synchronized
     fun load(prefs: SharedPreferences) {
@@ -56,6 +68,9 @@ object Trip {
         startWall = prefs.getLong("trip_start", 0L)
         lastWall = prefs.getLong("trip_last", 0L)
         totalMeters = prefs.getFloat("total_m", 0f).toDouble()
+        lastLat = java.lang.Double.longBitsToDouble(prefs.getLong("park_lat", 0L))
+        lastLon = java.lang.Double.longBitsToDouble(prefs.getLong("park_lon", 0L))
+        lastSeen = lastWall
     }
 
     /** Ends the trip by hand: files it and starts from zero. */
@@ -77,6 +92,9 @@ object Trip {
         }
         lastWall = wall
         if (startWall == 0L) startWall = wall
+        lastLat = location.latitude
+        lastLon = location.longitude
+        lastSeen = wall
 
         val speed = if (location.hasSpeed()) location.speed else 0f
         val step = if (lastUptime == 0L) 0L else uptime - lastUptime
@@ -90,7 +108,11 @@ object Trip {
             movingMs += step
             topKmh = max(topKmh, (speed * 3.6f).toInt())
         }
-        if (uptime - lastSaved > SAVE_EVERY_MS) save(prefs)
+        // Saved every few seconds, and at once when the car comes to a stop, so
+        // the place it was parked survives the unit losing power with the key.
+        val moving = speed >= MOVING_MPS
+        if (uptime - lastSaved > SAVE_EVERY_MS || (wasMoving && !moving)) save(prefs)
+        wasMoving = moving
     }
 
     /** Fuel burned since the last call, from the engine's air flow. */
@@ -108,6 +130,8 @@ object Trip {
                 .put("ms", movingMs)
                 .put("top", topKmh)
                 .put("l", liters)
+                .put("lat", lastLat)
+                .put("lon", lastLon)
             val old = try {
                 JSONArray(prefs.getString("trips", "[]"))
             } catch (ex: Exception) {
@@ -145,6 +169,8 @@ object Trip {
             .putLong("trip_start", startWall)
             .putLong("trip_last", lastWall)
             .putFloat("total_m", totalMeters.toFloat())
+            .putLong("park_lat", java.lang.Double.doubleToRawLongBits(lastLat))
+            .putLong("park_lon", java.lang.Double.doubleToRawLongBits(lastLon))
             .apply()
     }
 
@@ -155,7 +181,7 @@ object Trip {
             val all = JSONArray(prefs.getString("trips", "[]"))
             for (i in 0 until all.length()) {
                 val o = all.getJSONObject(i)
-                out.add(Past(o.optLong("t"), o.optDouble("m", 0.0), o.optLong("ms"), o.optInt("top"), o.optDouble("l", 0.0)))
+                out.add(Past(o.optLong("t"), o.optDouble("m", 0.0), o.optLong("ms"), o.optInt("top"), o.optDouble("l", 0.0), o.optDouble("lat", 0.0), o.optDouble("lon", 0.0)))
             }
         } catch (ex: Exception) {
             // A damaged list reads as empty
@@ -171,7 +197,7 @@ object Trip {
 
     private const val GAP_MS = 30L * 60 * 1000
     private const val MAX_STEP_MS = 10_000L
-    private const val SAVE_EVERY_MS = 30_000L
+    private const val SAVE_EVERY_MS = 10_000L
     private const val MOVING_MPS = 0.9f
     private const val MIN_FILED_M = 500.0
     private const val KEEP = 60

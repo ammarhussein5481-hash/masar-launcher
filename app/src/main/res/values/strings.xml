@@ -189,4 +189,5 @@
     <string name="set_autoplay">Open CarPlay by itself: %1$s</string>
     <string name="set_report">OBD report</string>
     <string name="report_empty">Nothing yet: the dongle has not connected in this session.</string>
+    <string name="parked_line">Last position · %1$s · tap for the map</string>
 </resources>

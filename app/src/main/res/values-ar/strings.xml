@@ -183,4 +183,5 @@
     <string name="set_autoplay">فتح كاربلاي تلقائياً: %1$s</string>
     <string name="set_report">تقرير OBD</string>
     <string name="report_empty">لا شيء بعد: القطعة لم تتصل في هذه الجلسة.</string>
+    <string name="parked_line">آخر موقع · %1$s · المس لفتح الخريطة</string>
 </resources>
