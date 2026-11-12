@@ -202,7 +202,19 @@ class DashCam(private val context: Context, private val listener: Listener) {
                 // Already released
             }
         }
+        // Nudge Android to look for the hotspot now, instead of at its next
+        // routine scan, so the internet comes back sooner.
+        ui.postDelayed({ rescan() }, 1500)
         listener.onCamState(CLOSED, -1)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun rescan() {
+        try {
+            (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).startScan()
+        } catch (ex: Exception) {
+            // Scans are rationed; the routine one will do
+        }
     }
 
     companion object {
