@@ -228,8 +228,27 @@ class MainActivity : Activity(), DashCam.Listener {
             cameraSetup(false)
             true
         }
-        findViewById<View>(R.id.camFrontBox).setOnClickListener { camZoom(0) }
-        findViewById<View>(R.id.camRearBox).setOnClickListener { camZoom(1) }
+        val frontBox = findViewById<View>(R.id.camFrontBox)
+        val rearBox = findViewById<View>(R.id.camRearBox)
+        frontBox.setOnClickListener { camZoom(0) }
+        rearBox.setOnClickListener { camZoom(1) }
+        // Keep each picture 16:9 inside its box, whatever shape the box is.
+        for ((box, id) in listOf(frontBox to R.id.camFront, rearBox to R.id.camRear)) {
+            val video = findViewById<View>(id)
+            box.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+                val w = right - left - box.paddingLeft - box.paddingRight
+                val h = bottom - top - box.paddingTop - box.paddingBottom
+                if (w <= 0 || h <= 0) return@addOnLayoutChangeListener
+                val fitW = min(w, h * 16 / 9)
+                val fitH = fitW * 9 / 16
+                val params = video.layoutParams
+                if (params.width != fitW || params.height != fitH) {
+                    params.width = fitW
+                    params.height = fitH
+                    video.post { video.layoutParams = params }
+                }
+            }
+        }
         onCamState(DashCam.CLOSED, -1)
         carStatus = findViewById(R.id.carStatus)
         carGauge = findViewById(R.id.carGauge)

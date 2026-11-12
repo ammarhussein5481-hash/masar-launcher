@@ -154,6 +154,15 @@ clear them. On GM trucks it also tries the transmission temperature. Readings
 the car does not give get no tile. Masar picks the paired device with "OBD" in
 its name; tap the status line on the page to choose another.
 
+## Dash cam page
+
+The fourth page shows the front and rear live view of a Wi-Fi dash cam, side
+by side; tap one to enlarge it. Written for the 70mai A800S, whose two streams
+are plain RTSP. The camera is its own Wi-Fi network without internet, so the
+unit leaves the phone's hotspot while the view is open and returns to it when
+you close the camera or leave the page. The camera's Wi-Fi password is asked
+for once and kept only on the unit.
+
 ## Install
 
 Download `masar.apk` from the [latest release](../../releases/latest), then:
