@@ -1323,6 +1323,13 @@ class MainActivity : Activity(), DashCam.Listener {
     override fun onCamState(state: Int, pane: Int) {
         if (pane >= 0) camPlaying[pane] = state == DashCam.PLAYING
         val open = dashCam.isOpen
+        if (!open) {
+            camPlaying[0] = false
+            camPlaying[1] = false
+        }
+        // A picture that is not playing is hidden, so no frozen last frame is left on screen.
+        findViewById<View>(R.id.camFront).alpha = if (camPlaying[0]) 1f else 0f
+        findViewById<View>(R.id.camRear).alpha = if (camPlaying[1]) 1f else 0f
         camButton.setText(if (open) R.string.cam_close else R.string.cam_open)
         when {
             state == DashCam.NOT_FOUND -> setStatus(camStatus, getString(R.string.cam_not_found), R.color.bad)

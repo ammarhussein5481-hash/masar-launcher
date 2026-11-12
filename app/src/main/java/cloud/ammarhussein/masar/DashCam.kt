@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Handler
 import android.os.Looper
@@ -54,6 +55,15 @@ class DashCam(private val context: Context, private val listener: Listener) {
         isOpen = true
         views[0] = front
         views[1] = rear
+        // Already on the camera's Wi-Fi (joined by hand in Settings)? Then there
+        // is nothing to ask Android for: use the connection as it is.
+        val already = currentCameraNetwork(ssidPrefix)
+        if (already != null) {
+            cm.bindProcessToNetwork(already)
+            listener.onCamState(JOINED, -1)
+            ui.postDelayed({ if (isOpen) { play(0); play(1) } }, 300)
+            return
+        }
         listener.onCamState(JOINING, -1)
         val specifier = WifiNetworkSpecifier.Builder()
             .setSsidPattern(PatternMatcher(ssidPrefix, PatternMatcher.PATTERN_PREFIX))
@@ -89,6 +99,21 @@ class DashCam(private val context: Context, private val listener: Listener) {
             cm.requestNetwork(request, made, JOIN_TIMEOUT_MS)
         } catch (ex: Exception) {
             fail(NOT_FOUND)
+        }
+    }
+
+    /** The Wi-Fi network the unit is on right now, if its name starts with [ssidPrefix]. */
+    @Suppress("DEPRECATION")
+    private fun currentCameraNetwork(ssidPrefix: String): Network? {
+        try {
+            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            val name = (wifi.connectionInfo?.ssid ?: "").trim('"')
+            if (ssidPrefix.isEmpty() || !name.startsWith(ssidPrefix)) return null
+            return cm.allNetworks.firstOrNull {
+                cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+            }
+        } catch (ex: Exception) {
+            return null
         }
     }
 
