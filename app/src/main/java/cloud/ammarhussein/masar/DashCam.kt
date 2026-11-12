@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiNetworkSpecifier
 import android.os.Handler
@@ -25,10 +26,16 @@ import androidx.media3.exoplayer.rtsp.RtspMediaSource
  *
  * The camera is its own Wi-Fi network with no internet, and a head unit has
  * one Wi-Fi radio, so looking at the camera means leaving the phone's hotspot
- * for as long as the view is open. [open] asks Android to join the camera's
- * network (the system shows its own "connect to device" sheet), points this
- * app's traffic at it, and plays the front and rear streams. [close] lets go
- * of the network and Android goes back to the hotspot by itself.
+ * for as long as the view is open. [open] switches the unit's Wi-Fi to the
+ * camera, points this app's traffic at it, and plays the front and rear
+ * streams. [close] removes the camera's network again and tells Android to
+ * reconnect, which brings it back to the saved hotspot.
+ *
+ * Switching Wi-Fi directly is something Android only allows apps built for
+ * Android 9 and earlier, which is why Masar's targetSdk is 28. If that route
+ * is refused (the camera's network was also saved by hand in Settings, say),
+ * [open] falls back to asking Android, which shows its "connect to device"
+ * sheet.
  *
  * The streams are plain RTSP with no password: H.264, 1280x720.
  */
@@ -46,6 +53,12 @@ class DashCam(private val context: Context, private val listener: Listener) {
     private val players = arrayOfNulls<ExoPlayer>(2)
     private val views = arrayOfNulls<TextureView>(2)
     private val retries = IntArray(2)
+    private val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+
+    /** The network Masar added for the camera, or -1. It is removed again on close. */
+    private var addedId = -1
+    private var joined = false
+    private var tries = 0
 
     var isOpen = false
         private set
@@ -65,6 +78,119 @@ class DashCam(private val context: Context, private val listener: Listener) {
             return
         }
         listener.onCamState(JOINING, -1)
+        joined = false
+        tries = 0
+        if (context.applicationInfo.targetSdkVersion < 29 && wifi.isWifiEnabled) {
+            switchTo(ssidPrefix, password)
+        } else {
+            askAndroid(ssidPrefix, password)
+        }
+    }
+
+    // ---------------------------------------------------------------- joining, directly
+
+    /** Finds the camera among the networks in range, adds it, and connects to it. */
+    @Suppress("DEPRECATION")
+    private fun switchTo(ssidPrefix: String, password: String) {
+        if (!isOpen) return
+        val name = try {
+            wifi.scanResults.mapNotNull { it.SSID }.firstOrNull { it.startsWith(ssidPrefix) }
+        } catch (ex: Exception) {
+            null
+        }
+        if (name == null) {
+            // Not in the last scan: look again, a few times.
+            if (tries % 3 == 0) {
+                try {
+                    wifi.startScan()
+                } catch (ex: Exception) {
+                    // Scans are rationed
+                }
+            }
+            if (++tries > 9) {
+                fail(NOT_FOUND)
+                return
+            }
+            ui.postDelayed({ switchTo(ssidPrefix, password) }, 1500)
+            return
+        }
+        val config = WifiConfiguration()
+        config.SSID = "\"" + name + "\""
+        config.preSharedKey = "\"" + password + "\""
+        val id = try {
+            wifi.addNetwork(config)
+        } catch (ex: Exception) {
+            -1
+        }
+        if (id == -1) {
+            // Refused, usually because the same network is already saved by hand.
+            askAndroid(ssidPrefix, password)
+            return
+        }
+        addedId = id
+        wifi.disconnect()
+        wifi.enableNetwork(id, true)
+        wifi.reconnect()
+        tries = 0
+        waitForCamera(ssidPrefix)
+    }
+
+    /** Polls until the unit is on the camera's network with an address, then starts the video. */
+    private fun waitForCamera(ssidPrefix: String) {
+        if (!isOpen) return
+        val network = currentCameraNetwork(ssidPrefix)
+        val ready = network != null && try {
+            cm.getLinkProperties(network)?.linkAddresses?.any { it.address is java.net.Inet4Address } == true
+        } catch (ex: Exception) {
+            false
+        }
+        if (network != null && ready) {
+            joined = true
+            cm.bindProcessToNetwork(network)
+            listener.onCamState(JOINED, -1)
+            ui.postDelayed({ if (isOpen) { play(0); play(1) } }, 500)
+            ui.postDelayed({ watchLink(ssidPrefix) }, 4000)
+            return
+        }
+        if (++tries > 40) {
+            fail(NOT_FOUND)
+            return
+        }
+        ui.postDelayed({ waitForCamera(ssidPrefix) }, 750)
+    }
+
+    /** While the camera is showing: notices if its Wi-Fi goes away. */
+    private fun watchLink(ssidPrefix: String) {
+        if (!isOpen || !joined) return
+        if (currentCameraNetwork(ssidPrefix) == null) {
+            fail(LOST)
+            return
+        }
+        ui.postDelayed({ watchLink(ssidPrefix) }, 3000)
+    }
+
+    /**
+     * Removes any camera network Masar added and never took away, for instance
+     * because the unit lost power while the camera was showing. Left in place,
+     * Android could join the camera by itself instead of the hotspot.
+     */
+    @Suppress("DEPRECATION")
+    fun tidy(ssidPrefix: String) {
+        if (isOpen || ssidPrefix.isEmpty() || context.applicationInfo.targetSdkVersion >= 29) return
+        try {
+            for (config in wifi.configuredNetworks ?: emptyList()) {
+                val name = (config.SSID ?: "").trim('"')
+                // Only networks this app created can be removed; the call just fails for the others.
+                if (name.startsWith(ssidPrefix)) wifi.removeNetwork(config.networkId)
+            }
+        } catch (ex: Exception) {
+            // No permission to list them: nothing to tidy
+        }
+    }
+
+    // ---------------------------------------------------------------- joining, by asking Android
+
+    private fun askAndroid(ssidPrefix: String, password: String) {
         val specifier = WifiNetworkSpecifier.Builder()
             .setSsidPattern(PatternMatcher(ssidPrefix, PatternMatcher.PATTERN_PREFIX))
             .setWpa2Passphrase(password)
@@ -106,7 +232,6 @@ class DashCam(private val context: Context, private val listener: Listener) {
     @Suppress("DEPRECATION")
     private fun currentCameraNetwork(ssidPrefix: String): Network? {
         try {
-            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             val name = (wifi.connectionInfo?.ssid ?: "").trim('"')
             if (ssidPrefix.isEmpty() || !name.startsWith(ssidPrefix)) return null
             return cm.allNetworks.firstOrNull {
@@ -183,6 +308,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
     fun close() {
         if (!isOpen) return
         isOpen = false
+        joined = false
         ui.removeCallbacksAndMessages(null)
         stop(0)
         stop(1)
@@ -202,16 +328,33 @@ class DashCam(private val context: Context, private val listener: Listener) {
                 // Already released
             }
         }
+        leaveCamera()
         // Nudge Android to look for the hotspot now, instead of at its next
         // routine scan, so the internet comes back sooner.
         ui.postDelayed({ rescan() }, 1500)
         listener.onCamState(CLOSED, -1)
     }
 
+    /** Takes the camera's network away again and has Android reconnect to what is saved. */
+    @Suppress("DEPRECATION")
+    private fun leaveCamera() {
+        val id = addedId
+        addedId = -1
+        if (id == -1) return
+        try {
+            wifi.disableNetwork(id)
+            wifi.removeNetwork(id)
+            wifi.disconnect()
+            wifi.reconnect()
+        } catch (ex: Exception) {
+            // Android will find the hotspot at its next scan
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun rescan() {
         try {
-            (context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).startScan()
+            wifi.startScan()
         } catch (ex: Exception) {
             // Scans are rationed; the routine one will do
         }

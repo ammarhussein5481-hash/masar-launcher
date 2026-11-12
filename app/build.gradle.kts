@@ -15,7 +15,9 @@ android {
     defaultConfig {
         applicationId = "cloud.ammarhussein.masar"
         minSdk = 26
-        targetSdk = 34
+        // 28 on purpose: the dash cam page switches Wi-Fi networks directly, which
+        // Android only allows apps built for Android 9 and earlier. See DashCam.kt.
+        targetSdk = 28
         versionCode = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInt()
         versionName = System.getenv("VERSION_NAME") ?: "1.0.0-dev"
     }

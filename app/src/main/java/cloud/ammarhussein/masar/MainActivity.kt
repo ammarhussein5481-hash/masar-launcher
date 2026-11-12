@@ -402,6 +402,7 @@ class MainActivity : Activity(), DashCam.Listener {
         }
         startMedia()
         Obd.start(this)
+        dashCam.tidy(prefs.getString("cam_ssid", "70mai") ?: "70mai")
         try {
             registerReceiver(phoneReceiver, IntentFilter(android.bluetooth.BluetoothDevice.ACTION_ACL_CONNECTED))
             phoneListening = true
