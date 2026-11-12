@@ -190,4 +190,8 @@
     <string name="set_report">OBD report</string>
     <string name="report_empty">Nothing yet: the dongle has not connected in this session.</string>
     <string name="parked_line">Last position · %1$s · tap for the map</string>
+    <string name="settings_title_version">Masar settings · v%1$s</string>
+    <string name="set_about">About Masar · v%1$s</string>
+    <string name="about_text">Version %1$s\n\nDeveloped by Ammar\nmasar.ammarhussein.cloud</string>
+    <string name="about_site">Open the website</string>
 </resources>

@@ -1267,10 +1267,11 @@ class MainActivity : Activity() {
             getString(R.string.set_obd, Obd.deviceName.ifEmpty { getString(R.string.obd_auto) }),
             getString(R.string.set_price, String.format(Locale.US, "%.2f", Options.fuelPrice(prefs)), getString(R.string.currency)),
             getString(R.string.set_autoplay, onOff(Options.autoCarPlay(prefs))),
-            getString(R.string.set_report)
+            getString(R.string.set_report),
+            getString(R.string.set_about, versionName())
         )
         AlertDialog.Builder(this)
-            .setTitle(R.string.settings_title)
+            .setTitle(getString(R.string.settings_title_version, versionName()))
             .setItems(items) { _, which ->
                 when (which) {
                     0 -> choose(R.string.settings_title, modeNames, mode) { setHandleMode(modes[it]) }
@@ -1324,6 +1325,7 @@ class MainActivity : Activity() {
                     10 -> chooseDongle()
                     11 -> priceDialog()
                     12 -> prefs.edit().putBoolean("auto_carplay", !Options.autoCarPlay(prefs)).apply()
+                    14 -> aboutDialog()
                     13 -> AlertDialog.Builder(this)
                         .setTitle(R.string.set_report)
                         .setMessage(Obd.report.ifEmpty { getString(R.string.report_empty) })
@@ -1331,6 +1333,23 @@ class MainActivity : Activity() {
                         .show()
                 }
             }
+            .show()
+    }
+
+    private fun versionName(): String = try {
+        packageManager.getPackageInfo(packageName, 0).versionName ?: ""
+    } catch (ex: Exception) {
+        ""
+    }
+
+    private fun aboutDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.app_name)
+            .setMessage(getString(R.string.about_text, versionName()))
+            .setPositiveButton(R.string.about_site) { _, _ ->
+                open(Intent(Intent.ACTION_VIEW, Uri.parse("https://masar.ammarhussein.cloud")), getString(R.string.app_name))
+            }
+            .setNegativeButton(R.string.close, null)
             .show()
     }
 

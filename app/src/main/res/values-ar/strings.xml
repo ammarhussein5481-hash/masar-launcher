@@ -184,4 +184,8 @@
     <string name="set_report">تقرير OBD</string>
     <string name="report_empty">لا شيء بعد: القطعة لم تتصل في هذه الجلسة.</string>
     <string name="parked_line">آخر موقع · %1$s · المس لفتح الخريطة</string>
+    <string name="settings_title_version">إعدادات مسار · v%1$s</string>
+    <string name="set_about">عن مسار · v%1$s</string>
+    <string name="about_text">الإصدار %1$s\n\nتطوير عمّار\nmasar.ammarhussein.cloud</string>
+    <string name="about_site">افتح الموقع</string>
 </resources>

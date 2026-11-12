@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Masar · a launcher for car head units</title>
+<meta name="description" content="Masar is a free, open-source home screen for Android car head units: big tiles, GPS speed, a drive page, live engine data from an OBD dongle, and a home bar that works over CarPlay.">
+<meta property="og:title" content="Masar · a launcher for car head units">
+<meta property="og:description" content="Big tiles, GPS speed, live engine data, and a way home from CarPlay. Free and open source.">
+<meta property="og:image" content="https://masar.ammarhussein.cloud/img/home.png">
+<meta name="theme-color" content="#0A0C0F">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23FFB020'/%3E%3Cpath d='M16 46V18h6l10 16 10-16h6v28h-6V29l-10 15-10-15v17z' fill='%231A1205'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#0A0C0F;--tile:#151A21;--stroke:#222A35;--text:#F2F4F7;--dim:#9AA4B2;--idle:#5B6573;--accent:#FFB020;--on-accent:#1A1205;--ok:#3DDC84}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.brand{display:flex;align-items:center;gap:12px;font-weight:600;font-size:20px;color:var(--text)}
+.brand i{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:var(--on-accent);font-style:normal;font-weight:700}
+.brand span{color:var(--dim);font-weight:400}
+nav a{color:var(--dim);margin-left:22px;font-size:15px}
+nav a:hover{color:var(--text);text-decoration:none}
+.hero{padding:56px 0 30px;display:grid;grid-template-columns:1fr;gap:34px}
+h1{font-size:clamp(38px,6.4vw,68px);line-height:1.04;font-weight:300;letter-spacing:-1.5px;max-width:15ch}
+h1 b{font-weight:300;color:var(--accent)}
+.lead{color:var(--dim);font-size:clamp(17px,2vw,20px);max-width:58ch;margin-top:18px}
+.cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;gap:10px;border-radius:16px;padding:14px 24px;font-weight:600;font-size:17px}
+.btn:hover{text-decoration:none;filter:brightness(1.08)}
+.primary{background:var(--accent);color:var(--on-accent)}
+.ghost{border:1.5px solid var(--stroke);color:var(--text);background:var(--tile)}
+.ver{color:var(--idle);font-size:14px}
+.shot{border-radius:22px;border:1.5px solid var(--stroke);overflow:hidden;background:var(--tile);box-shadow:0 30px 80px #000a}
+.shot img{display:block;width:100%;height:auto}
+section{padding:64px 0 0}
+h2{font-size:clamp(26px,3.4vw,36px);font-weight:400;letter-spacing:-.4px}
+.sub{color:var(--dim);margin-top:8px;max-width:62ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:28px}
+.card{background:var(--tile);border:1.5px solid var(--stroke);border-radius:22px;padding:22px}
+.card h3{font-size:18px;font-weight:600;margin-bottom:6px}
+.card p{color:var(--dim);font-size:15.5px;line-height:1.55}
+.card .k{display:inline-block;color:var(--accent);font-size:13px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px}
+.tour{display:grid;gap:44px;margin-top:34px}
+.row{display:grid;grid-template-columns:1fr;gap:20px;align-items:center}
+.row h3{font-size:22px;font-weight:500}
+.row p{color:var(--dim);margin-top:8px}
+.row ul{color:var(--dim);margin:10px 0 0 18px;font-size:16px}
+.row li{margin:4px 0}
+ol.steps{counter-reset:s;list-style:none;padding:0;margin-top:26px;display:grid;gap:12px}
+ol.steps li{counter-increment:s;background:var(--tile);border:1.5px solid var(--stroke);border-radius:18px;padding:16px 18px 16px 62px;position:relative;color:var(--dim)}
+ol.steps li::before{content:counter(s);position:absolute;left:18px;top:15px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:15px}
+ol.steps b{color:var(--text);font-weight:600}
+code{font:14.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0f1319;border:1px solid var(--stroke);border-radius:8px;padding:2px 7px;color:var(--text);word-break:break-all}
+.note{color:var(--idle);font-size:14.5px;margin-top:14px;max-width:70ch}
+footer{margin-top:80px;border-top:1.5px solid var(--stroke);padding:30px 0 46px;color:var(--dim);font-size:15px;display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-between}
+footer b{color:var(--text);font-weight:600}
+@media(min-width:880px){
+  .hero{grid-template-columns:5fr 6fr;align-items:center;padding-top:70px}
+  .row{grid-template-columns:5fr 7fr;gap:40px}
+  .row.flip{grid-template-columns:7fr 5fr}
+  .row.flip .txt{order:2}
+}
+@media(max-width:560px){nav a:not(.keep){display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="brand" href="/"><i>M</i>Masar <span>مسار</span></a>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#tour">Tour</a>
+    <a href="#install">Install</a>
+    <a class="keep" href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div>
+    <h1>The home screen your car's head unit <b>should have come with.</b></h1>
+    <p class="lead">Masar is a launcher for Android head units. Big tiles you can hit without looking, your speed and the next prayer at a glance, live engine data from an OBD dongle, and a way back home from CarPlay.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">Download the APK</a>
+      <a class="btn ghost" href="https://github.com/ammarhussein5481-hash/masar-launcher">Source on GitHub</a>
+    </div>
+    <p class="ver" id="ver">Free and open source · Android 8 and newer</p>
+  </div>
+  <div class="shot"><img src="img/home.png" width="1200" height="720" alt="Masar home page: clock, speed, next prayer and eight large app tiles"></div>
+</div>
+
+<section id="features">
+  <h2>Built for a screen you read at 120 km/h</h2>
+  <p class="sub">Everything is sized from the screen itself, so it looks the same on any head unit. No account, no ads, no tracking.</p>
+  <div class="grid">
+    <div class="card"><span class="k">Home</span><h3>Eight or twelve big tiles</h3><p>Your apps, with CarPlay as the main one. Long-press a tile to change it. Clock, date, GPS speed and heading on the left.</p></div>
+    <div class="card"><span class="k">Over any app</span><h3>A home bar that appears on touch</h3><p>Touch the screen in CarPlay or a map and a bar with Home, Back, volume and your apps shows for a few seconds, then gets out of the way.</p></div>
+    <div class="card"><span class="k">Car</span><h3>Live engine data</h3><p>With a Bluetooth OBD dongle: RPM, coolant and transmission temperature, battery, fuel, consumption, and fault codes in plain words.</p></div>
+    <div class="card"><span class="k">Warnings</span><h3>It tells you, wherever you are</h3><p>Engine or transmission running hot, charging voltage off, a soft tyre or a new fault code: a red banner on top of whatever is on screen.</p></div>
+    <div class="card"><span class="k">Drive</span><h3>Compass, map and weather</h3><p>A course-up compass, a small map that follows the car, and a three-day forecast for where you are.</p></div>
+    <div class="card"><span class="k">Trips</span><h3>Distance, fuel and cost</h3><p>Each drive is counted by itself: distance, time, average, fuel burned and what it cost. Past trips are kept, with where each one ended.</p></div>
+    <div class="card"><span class="k">Daily</span><h3>Prayer times, offline</h3><p>The next prayer and the time left, worked out on the unit with the Umm al-Qura method. No internet needed.</p></div>
+    <div class="card"><span class="k">Yours</span><h3>العربية, night dimming, colours</h3><p>English or Arabic, a veil after sunset so the screen doesn't glare, six accent colours and your own background photo.</p></div>
+  </div>
+</section>
+
+<section id="tour">
+  <h2>Three pages, one swipe apart</h2>
+  <div class="tour">
+    <div class="row">
+      <div class="txt"><h3>Drive</h3><p>What's around you.</p><ul><li>Compass that turns with the car</li><li>Map from OpenStreetMap; tap to open your map app</li><li>Weather from Open-Meteo, with your position rounded before it is sent</li><li>This trip's distance, time and speeds</li></ul></div>
+      <div class="shot"><img loading="lazy" src="img/drive.png" width="1200" height="720" alt="Drive page: compass, map and weather"></div>
+    </div>
+    <div class="row flip">
+      <div class="txt"><h3>Car</h3><p>What the engine is doing, read through a classic-Bluetooth ELM327 dongle in the OBD port.</p><ul><li>Readings the car doesn't report get no tile</li><li>Fuel use live and per trip, range, and cost at your petrol price</li><li>Fault codes with names, and a button to clear them</li><li>Oil life and service reminders</li></ul></div>
+      <div class="shot"><img loading="lazy" src="img/car.png" width="1200" height="720" alt="Car page: rev counter, engine readings, fault codes, trip and service"></div>
+    </div>
+    <div class="row">
+      <div class="txt"><h3>Home bar</h3><p>Full-screen apps hide the unit's own buttons. Masar gives them back when you ask, and only then.</p><ul><li>Touch anywhere: the bar shows for four seconds</li><li>Home, Back, Recents, volume, and your first three apps</li><li>Or a small pill instead, if you prefer</li></ul></div>
+      <div class="shot"><img loading="lazy" src="img/bar.png" width="1200" height="720" alt="The home bar shown over a navigation app"></div>
+    </div>
+    <div class="row flip">
+      <div class="txt"><h3>Warnings</h3><p>Masar keeps watching the car while CarPlay is in front, and speaks up only when something is past normal.</p><ul><li>One beep when a warning starts</li><li>The banner stays until the value is back to normal</li><li>Speed alert at a limit you choose</li></ul></div>
+      <div class="shot"><img loading="lazy" src="img/warning.png" width="1200" height="720" alt="A red warning banner shown over a navigation app"></div>
+    </div>
+  </div>
+  <p class="note">The images are design renders at 1200 × 720 with example numbers. What you see depends on your unit, your car and your dongle.</p>
+</section>
+
+<section id="install">
+  <h2>Install</h2>
+  <p class="sub">Masar is a normal Android app. It is not on the Play Store; you install the APK yourself.</p>
+  <ol class="steps">
+    <li><b>Download</b> <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">masar.apk</a> on the head unit, or copy it over on a USB stick.</li>
+    <li><b>Open it</b> and allow installing from that source when Android asks.</li>
+    <li><b>Press Home</b> and choose Masar, then "Always".</li>
+    <li><b>Allow location</b> when asked, for speed, map and prayer times. For the home bar, allow "Display over other apps".</li>
+    <li><b>Long-press the clock</b> for settings. For engine data, pair an ELM327 Bluetooth dongle in the unit's Bluetooth settings, then swipe to the Car page.</li>
+  </ol>
+  <p class="note">From a computer: <code>adb install -r masar.apk</code>. To leave, pick another launcher under Settings → Apps → Default apps → Home app. Tested on an Android 10 head unit at 1200 × 720; other units should work but have not been tried.</p>
+</section>
+
+<footer>
+  <div><b>Masar</b> · مسار · developed by Ammar</div>
+  <div><a href="https://masar.ammarhussein.cloud">masar.ammarhussein.cloud</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases">All versions</a></div>
+</footer>
+
+</div>
+<script>
+// Show the current version next to the download button.
+fetch('https://api.github.com/repos/ammarhussein5481-hash/masar-launcher/releases/latest')
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (d) {
+    if (!d || !d.tag_name) return;
+    var when = new Date(d.published_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('ver').textContent = 'Version ' + d.tag_name.replace(/^v/, '') + ' · ' + when + ' · free and open source · Android 8 and newer';
+  })
+  .catch(function () {});
+</script>
+</body>
+</html>

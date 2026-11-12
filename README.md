@@ -1,5 +1,7 @@
 # Masar
 
+**[masar.ammarhussein.cloud](https://masar.ammarhussein.cloud)** · developed by Ammar
+
 A calm, glanceable home screen for Android car head units. *Masar* (مسار) means "route".
 
 ![Design preview](docs/preview.png)
