@@ -194,4 +194,21 @@
     <string name="set_about">About Masar · v%1$s</string>
     <string name="about_text">Version %1$s\n\nDeveloped by Ammar\nmasar.ammarhussein.cloud</string>
     <string name="about_site">Open the website</string>
+    <!-- Dash cam page -->
+    <string name="cam_front">Front</string>
+    <string name="cam_rear">Rear</string>
+    <string name="cam_open">Show camera</string>
+    <string name="cam_close">Close camera</string>
+    <string name="cam_idle">Dash cam · the internet pauses while the camera is on</string>
+    <string name="cam_joining">Joining the camera\'s Wi-Fi… choose it if Android asks</string>
+    <string name="cam_starting">Connected · starting the picture…</string>
+    <string name="cam_live">Live · tap a picture to enlarge it</string>
+    <string name="cam_no_video">Connected, but the camera sent no picture</string>
+    <string name="cam_not_found">Camera not found. Is its Wi-Fi on? Long-press the button to check the password.</string>
+    <string name="cam_lost">The camera\'s Wi-Fi dropped</string>
+    <string name="cam_setup_title">Dash cam Wi-Fi</string>
+    <string name="cam_setup_text">The name of the camera\'s Wi-Fi (or how it starts) and its password. They stay on this unit.</string>
+    <string name="cam_ssid_hint">Wi-Fi name starts with</string>
+    <string name="cam_pass_hint">Wi-Fi password</string>
+    <string name="cam_pass_short">The password needs at least 8 characters</string>
 </resources>

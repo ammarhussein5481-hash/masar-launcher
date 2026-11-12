@@ -78,7 +78,7 @@ class AppEntry(val label: String, val component: ComponentName, val icon: Drawab
  * Every size is derived from the screen height (see [applySizes]), so the layout
  * looks the same on any head unit resolution or density.
  */
-class MainActivity : Activity() {
+class MainActivity : Activity(), DashCam.Listener {
 
     private lateinit var prefs: SharedPreferences
     private lateinit var home: View
@@ -97,6 +97,13 @@ class MainActivity : Activity() {
 
     private lateinit var page2: View
     private lateinit var page3: View
+    private lateinit var page4: View
+    private lateinit var camStatus: TextView
+    private lateinit var camButton: TextView
+    private lateinit var dashCam: DashCam
+    /** Which camera pane fills the page: -1 for both side by side. */
+    private var camBig = -1
+    private val camPlaying = BooleanArray(2)
     private lateinit var pages: List<View>
     private lateinit var dots: List<View>
     private lateinit var carStatus: TextView
@@ -210,8 +217,20 @@ class MainActivity : Activity() {
 
         page2 = findViewById(R.id.page2)
         page3 = findViewById(R.id.page3)
-        pages = listOf(home, page2, page3)
-        dots = listOf<View>(findViewById(R.id.dot0), findViewById(R.id.dot1), findViewById(R.id.dot2))
+        page4 = findViewById(R.id.page4)
+        pages = listOf(home, page2, page3, page4)
+        dots = listOf<View>(findViewById(R.id.dot0), findViewById(R.id.dot1), findViewById(R.id.dot2), findViewById(R.id.dot3))
+        camStatus = findViewById(R.id.camStatus)
+        camButton = findViewById(R.id.camButton)
+        dashCam = DashCam(this, this)
+        camButton.setOnClickListener { if (dashCam.isOpen) dashCam.close() else openCamera() }
+        camButton.setOnLongClickListener {
+            cameraSetup(false)
+            true
+        }
+        findViewById<View>(R.id.camFrontBox).setOnClickListener { camZoom(0) }
+        findViewById<View>(R.id.camRearBox).setOnClickListener { camZoom(1) }
+        onCamState(DashCam.CLOSED, -1)
         carStatus = findViewById(R.id.carStatus)
         carGauge = findViewById(R.id.carGauge)
         carSpeed = findViewById(R.id.carSpeed)
@@ -413,6 +432,7 @@ class MainActivity : Activity() {
         HandleService.homeVisible = false
         stopGps()
         stopMedia()
+        dashCam.close()
         ui.removeCallbacks(carTick)
         if (phoneListening) {
             phoneListening = false
@@ -508,6 +528,8 @@ class MainActivity : Activity() {
         for (i in dots.indices) dots[i].backgroundTintList = ColorStateList.valueOf(if (i == index) accent else idle)
         if (index == 1) refreshWeather(false)
         if (index == 2) renderCar()
+        // Leaving the camera page gives the Wi-Fi back to the hotspot.
+        if (index != 3 && from == 3) dashCam.close()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -598,6 +620,7 @@ class MainActivity : Activity() {
         prayer.setTextColor(accent)
         compass.accent = accent
         carGauge.accent = accent
+        camButton.backgroundTintList = ColorStateList.valueOf(accent)
         map.accent = accent
         showPage(page)
     }
@@ -1212,6 +1235,88 @@ class MainActivity : Activity() {
         }
     }
 
+    // ---------------------------------------------------------------- dash cam page
+
+    /** Asks for the camera's Wi-Fi name and password the first time, then joins it. */
+    private fun openCamera() {
+        if (prefs.getString("cam_pass", "").isNullOrEmpty()) {
+            cameraSetup(true)
+            return
+        }
+        if (!hasLocationPermission()) {
+            // Android only lets an app pick a Wi-Fi network if it may see the ones nearby.
+            requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1)
+            return
+        }
+        camPlaying[0] = false
+        camPlaying[1] = false
+        dashCam.open(
+            prefs.getString("cam_ssid", "70mai") ?: "70mai",
+            prefs.getString("cam_pass", "") ?: "",
+            findViewById(R.id.camFront), findViewById(R.id.camRear)
+        )
+    }
+
+    /** The camera's Wi-Fi name (or how it starts) and its password. Kept only on this unit. */
+    private fun cameraSetup(thenOpen: Boolean) {
+        val pad = (resources.displayMetrics.density * 20f).roundToInt()
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(pad, pad / 2, pad, 0)
+        val name = android.widget.EditText(this)
+        name.hint = getString(R.string.cam_ssid_hint)
+        name.setText(prefs.getString("cam_ssid", "70mai"))
+        name.setSingleLine()
+        val pass = android.widget.EditText(this)
+        pass.hint = getString(R.string.cam_pass_hint)
+        pass.setText(prefs.getString("cam_pass", ""))
+        pass.setSingleLine()
+        pass.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        box.addView(name)
+        box.addView(pass)
+        AlertDialog.Builder(this)
+            .setTitle(R.string.cam_setup_title)
+            .setMessage(R.string.cam_setup_text)
+            .setView(box)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val typed = pass.text.toString()
+                if (typed.length < 8) {
+                    Toast.makeText(this, R.string.cam_pass_short, Toast.LENGTH_LONG).show()
+                } else {
+                    prefs.edit()
+                        .putString("cam_ssid", name.text.toString().trim().ifEmpty { "70mai" })
+                        .putString("cam_pass", typed)
+                        .apply()
+                    if (thenOpen) openCamera()
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** A tap on a picture makes it fill the page; another tap brings both back. */
+    private fun camZoom(pane: Int) {
+        camBig = if (camBig == pane) -1 else pane
+        findViewById<View>(R.id.camFrontBox).visibility = if (camBig == 1) View.GONE else View.VISIBLE
+        findViewById<View>(R.id.camRearBox).visibility = if (camBig == 0) View.GONE else View.VISIBLE
+    }
+
+    override fun onCamState(state: Int, pane: Int) {
+        if (pane >= 0) camPlaying[pane] = state == DashCam.PLAYING
+        val open = dashCam.isOpen
+        camButton.setText(if (open) R.string.cam_close else R.string.cam_open)
+        when {
+            state == DashCam.NOT_FOUND -> setStatus(camStatus, getString(R.string.cam_not_found), R.color.bad)
+            state == DashCam.LOST -> setStatus(camStatus, getString(R.string.cam_lost), R.color.bad)
+            !open -> setStatus(camStatus, getString(R.string.cam_idle), R.color.idle)
+            state == DashCam.JOINING -> setStatus(camStatus, getString(R.string.cam_joining), R.color.accent)
+            camPlaying[0] || camPlaying[1] -> setStatus(camStatus, getString(R.string.cam_live), R.color.ok)
+            state == DashCam.NO_VIDEO && !camPlaying[0] && !camPlaying[1] ->
+                setStatus(camStatus, getString(R.string.cam_no_video), R.color.bad)
+            else -> setStatus(camStatus, getString(R.string.cam_starting), R.color.accent)
+        }
+    }
+
     // ---------------------------------------------------------------- settings
 
     /** A list to pick one of; [current] is ticked. */
@@ -1427,6 +1532,10 @@ class MainActivity : Activity() {
         px(npArtist, 3.2f)
         px(trip, 3.4f)
 
+        px(camStatus, 3.6f)
+        px(camButton, 3.8f)
+        px(findViewById(R.id.camFrontLabel), 3.2f)
+        px(findViewById(R.id.camRearLabel), 3.2f)
         px(stripCoolant, 3.6f)
         px(stripTrans, 3.6f)
         px(stripFuel, 3.6f)

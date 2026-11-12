@@ -188,4 +188,20 @@
     <string name="set_about">عن مسار · v%1$s</string>
     <string name="about_text">الإصدار %1$s\n\nتطوير عمّار\nmasar.ammarhussein.cloud</string>
     <string name="about_site">افتح الموقع</string>
+    <string name="cam_front">الأمامية</string>
+    <string name="cam_rear">الخلفية</string>
+    <string name="cam_open">اعرض الكاميرا</string>
+    <string name="cam_close">أغلق الكاميرا</string>
+    <string name="cam_idle">كاميرا السيارة · يتوقف الإنترنت أثناء تشغيل الكاميرا</string>
+    <string name="cam_joining">جارٍ الاتصال بواي فاي الكاميرا… اخترها إذا سألك أندرويد</string>
+    <string name="cam_starting">متصل · جارٍ تشغيل الصورة…</string>
+    <string name="cam_live">مباشر · المس الصورة لتكبيرها</string>
+    <string name="cam_no_video">متصل، لكن الكاميرا لم ترسل صورة</string>
+    <string name="cam_not_found">لم يُعثر على الكاميرا. هل الواي فاي فيها يعمل؟ اضغط مطوّلاً على الزر لمراجعة كلمة المرور.</string>
+    <string name="cam_lost">انقطع واي فاي الكاميرا</string>
+    <string name="cam_setup_title">واي فاي الكاميرا</string>
+    <string name="cam_setup_text">اسم واي فاي الكاميرا (أو بدايته) وكلمة المرور. تبقى محفوظة على هذا الجهاز فقط.</string>
+    <string name="cam_ssid_hint">اسم الواي فاي يبدأ بـ</string>
+    <string name="cam_pass_hint">كلمة مرور الواي فاي</string>
+    <string name="cam_pass_short">كلمة المرور 8 أحرف على الأقل</string>
 </resources>
