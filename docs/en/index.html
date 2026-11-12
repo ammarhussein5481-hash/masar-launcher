@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Masar · a launcher for car head units</title>
-<meta name="description" content="Masar is a free, open-source home screen for Android car head units: big tiles, GPS speed, a drive page, live engine data from an OBD dongle, and a home bar that works over CarPlay.">
+<meta name="description" content="Masar is a home screen for Android car head units: big tiles, GPS speed, a drive page, live engine data from an OBD dongle, and a home bar that works over CarPlay.">
 <meta property="og:title" content="Masar · a launcher for car head units">
-<meta property="og:description" content="Big tiles, GPS speed, live engine data, and a way home from CarPlay. Free and open source.">
+<meta property="og:description" content="Big tiles, GPS speed, live engine data, and a way home from CarPlay.">
 <meta property="og:image" content="https://masar.ammarhussein.cloud/img/home.png">
 <link rel="alternate" hreflang="en" href="https://masar.ammarhussein.cloud/en/">
 <link rel="alternate" hreflang="ar" href="https://masar.ammarhussein.cloud/">
@@ -35,6 +35,12 @@ h1 b{font-weight:300;color:var(--accent)}
 .btn:hover{text-decoration:none;filter:brightness(1.08)}
 .primary{background:var(--accent);color:var(--on-accent)}
 .ghost{border:1.5px solid var(--stroke);color:var(--text);background:var(--tile)}
+.gate{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px;max-width:520px}
+.gate input{flex:1;min-width:190px;background:var(--tile);border:1.5px solid var(--stroke);border-radius:16px;color:var(--text);font:600 20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:2px;padding:14px 18px;text-transform:uppercase;direction:ltr;text-align:center}
+.gate input::placeholder{color:var(--idle);font-weight:400;letter-spacing:0;font-family:inherit;text-transform:none}
+.gate input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.gate button{border:0;cursor:pointer;font-family:inherit}
+.gatemsg{min-height:26px;margin-top:10px;font-size:15px;color:#FF5A5A}
 .ver{color:var(--idle);font-size:14px}
 .shot{border-radius:22px;border:1.5px solid var(--stroke);overflow:hidden;background:var(--tile);box-shadow:0 30px 80px #000a}
 .shot img{display:block;width:100%;height:auto}
@@ -83,7 +89,6 @@ footer b{color:var(--text);font-weight:600}
     <a href="#features">Features</a>
     <a href="#tour">Tour</a>
     <a href="#install">Install</a>
-    <a class="keep" href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a>
     <a class="keep" href="/" lang="ar">العربية</a>
   </nav>
 </header>
@@ -92,11 +97,12 @@ footer b{color:var(--text);font-weight:600}
   <div>
     <h1>The home screen your car's head unit <b>should have come with.</b></h1>
     <p class="lead">Masar is a launcher for Android head units. Big tiles you can hit without looking, your speed and the next prayer at a glance, live engine data from an OBD dongle, and a way back home from CarPlay.</p>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">Download the APK</a>
-      <a class="btn ghost" href="https://github.com/ammarhussein5481-hash/masar-launcher">Source on GitHub</a>
-    </div>
-    <p class="ver" id="ver">Free and open source · Android 8 and newer</p>
+    <form class="gate" id="gate" action="/download" method="get">
+      <input id="code" name="code" placeholder="Download code" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Download code">
+      <button class="btn primary" type="submit">Download the app</button>
+    </form>
+    <p class="gatemsg" id="gatemsg" role="status"></p>
+    <p class="ver" id="ver">Download with a code · Android 8 and newer</p>
   </div>
   <div class="shot"><img src="../img/home.png" width="1200" height="720" alt="Masar home page: clock, speed, next prayer and eight large app tiles"></div>
 </div>
@@ -141,9 +147,9 @@ footer b{color:var(--text);font-weight:600}
 
 <section id="install">
   <h2>Install</h2>
-  <p class="sub">Masar is a normal Android app. It is not on the Play Store; you install the APK yourself.</p>
+  <p class="sub">Masar is a normal Android app. It is not on the Play Store; you download the APK with a code from the developer and install it yourself.</p>
   <ol class="steps">
-    <li><b>Download</b> <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">masar.apk</a> on the head unit, or copy it over on a USB stick.</li>
+    <li><b>Enter your download code</b> at the top of this page, in the head unit's browser, to get the file. Or download it on another device and copy it over on a USB stick. A code works for one download.</li>
     <li><b>Open it</b> and allow installing from that source when Android asks.</li>
     <li><b>Press Home</b> and choose Masar, then "Always".</li>
     <li><b>Allow location</b> when asked, for speed, map and prayer times. For the home bar, allow "Display over other apps".</li>
@@ -154,20 +160,34 @@ footer b{color:var(--text);font-weight:600}
 
 <footer>
   <div><b>Masar</b> · مسار · developed by Ammar</div>
-  <div><a href="https://masar.ammarhussein.cloud">masar.ammarhussein.cloud</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases">All versions</a></div>
+  <div><a href="https://masar.ammarhussein.cloud/en/">masar.ammarhussein.cloud</a></div>
 </footer>
 
 </div>
 <script>
-// Show the current version next to the download button.
-fetch('https://api.github.com/repos/ammarhussein5481-hash/masar-launcher/releases/latest')
-  .then(function (r) { return r.ok ? r.json() : null; })
-  .then(function (d) {
-    if (!d || !d.tag_name) return;
-    var when = new Date(d.published_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    document.getElementById('ver').textContent = 'Version ' + d.tag_name.replace(/^v/, '') + ' · ' + when + ' · free and open source · Android 8 and newer';
-  })
-  .catch(function () {});
+// The current version, and the code box: check the code, then start the download.
+fetch('/api/version').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+  if (!d || !d.version) return;
+  var when = new Date(d.published).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  document.getElementById('ver').textContent = 'Version ' + d.version + ' · ' + when + ' · download with a code · Android 8 and newer';
+}).catch(function () {});
+var form = document.getElementById('gate'), box = document.getElementById('code'), msg = document.getElementById('gatemsg');
+form.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var code = box.value.trim();
+  msg.style.color = '';
+  if (!code) { msg.textContent = 'Enter your code first.'; return; }
+  fetch('/api/check?code=' + encodeURIComponent(code)).then(function (r) {
+    if (r.status === 429) { msg.textContent = 'Too many tries. Please wait a little.'; return null; }
+    return r.json();
+  }).then(function (d) {
+    if (!d) return;
+    if (!d.ok) { msg.textContent = 'This code is not valid or has already been used.'; return; }
+    msg.style.color = '#3DDC84';
+    msg.textContent = 'Download started. Open the file to install it.';
+    window.location.href = '/download?code=' + encodeURIComponent(code);
+  }).catch(function () { msg.textContent = 'Could not connect. Try again.'; });
+});
 </script>
 </body>
 </html>

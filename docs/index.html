@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>مسار · واجهة رئيسية لشاشات السيارات</title>
-<meta name="description" content="مسار واجهة رئيسية مجانية ومفتوحة المصدر لشاشات أندرويد في السيارات: خانات كبيرة، السرعة من GPS، بيانات المحرك مباشرة من قطعة OBD، وشريط للعودة للرئيسية يعمل فوق كاربلاي.">
+<meta name="description" content="مسار واجهة رئيسية لشاشات أندرويد في السيارات: خانات كبيرة، السرعة من GPS، بيانات المحرك مباشرة من قطعة OBD، وشريط للعودة للرئيسية يعمل فوق كاربلاي.">
 <meta property="og:title" content="مسار · واجهة رئيسية لشاشات السيارات">
-<meta property="og:description" content="خانات كبيرة، السرعة، بيانات المحرك مباشرة، وطريق للعودة من كاربلاي. مجاني ومفتوح المصدر.">
+<meta property="og:description" content="خانات كبيرة، السرعة، بيانات المحرك مباشرة، وطريق للعودة من كاربلاي.">
 <meta property="og:image" content="https://masar.ammarhussein.cloud/img/home.png">
 <link rel="alternate" hreflang="en" href="https://masar.ammarhussein.cloud/en/">
 <link rel="alternate" hreflang="ar" href="https://masar.ammarhussein.cloud/">
@@ -35,6 +35,12 @@ h1 b{font-weight:300;color:var(--accent)}
 .btn:hover{text-decoration:none;filter:brightness(1.08)}
 .primary{background:var(--accent);color:var(--on-accent)}
 .ghost{border:1.5px solid var(--stroke);color:var(--text);background:var(--tile)}
+.gate{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px;max-width:520px}
+.gate input{flex:1;min-width:190px;background:var(--tile);border:1.5px solid var(--stroke);border-radius:16px;color:var(--text);font:600 20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:2px;padding:14px 18px;text-transform:uppercase;direction:ltr;text-align:center}
+.gate input::placeholder{color:var(--idle);font-weight:400;letter-spacing:0;font-family:inherit;text-transform:none}
+.gate input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.gate button{border:0;cursor:pointer;font-family:inherit}
+.gatemsg{min-height:26px;margin-top:10px;font-size:15px;color:#FF5A5A}
 .ver{color:var(--idle);font-size:14px}
 .shot{border-radius:22px;border:1.5px solid var(--stroke);overflow:hidden;background:var(--tile);box-shadow:0 30px 80px #000a}
 .shot img{display:block;width:100%;height:auto}
@@ -83,7 +89,6 @@ footer b{color:var(--text);font-weight:600}
     <a href="#features">المزايا</a>
     <a href="#tour">جولة</a>
     <a href="#install">التثبيت</a>
-    <a class="keep" href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a>
     <a class="keep" href="/en/" lang="en">English</a>
   </nav>
 </header>
@@ -92,11 +97,12 @@ footer b{color:var(--text);font-weight:600}
   <div>
     <h1>الواجهة التي <b>كان يجب أن تأتي</b> مع شاشة سيارتك.</h1>
     <p class="lead">مسار واجهة رئيسية لشاشات أندرويد في السيارات. خانات كبيرة تضغطها دون أن تنظر، سرعتك وموعد الصلاة القادمة بنظرة واحدة، بيانات المحرك مباشرة من قطعة OBD، وطريق للعودة إلى الرئيسية من كاربلاي.</p>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">حمّل التطبيق (APK)</a>
-      <a class="btn ghost" href="https://github.com/ammarhussein5481-hash/masar-launcher">الكود على GitHub</a>
-    </div>
-    <p class="ver" id="ver">مجاني ومفتوح المصدر · أندرويد 8 وما بعده</p>
+    <form class="gate" id="gate" action="/download" method="get">
+      <input id="code" name="code" placeholder="رمز التحميل" maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="رمز التحميل">
+      <button class="btn primary" type="submit">حمّل التطبيق</button>
+    </form>
+    <p class="gatemsg" id="gatemsg" role="status"></p>
+    <p class="ver" id="ver">التحميل برمز · أندرويد 8 وما بعده</p>
   </div>
   <div class="shot"><img src="img/home.png" width="1200" height="720" alt="الصفحة الرئيسية في مسار: الساعة والسرعة والصلاة القادمة وثماني خانات كبيرة للتطبيقات"></div>
 </div>
@@ -141,9 +147,9 @@ footer b{color:var(--text);font-weight:600}
 
 <section id="install">
   <h2>التثبيت</h2>
-  <p class="sub">مسار تطبيق أندرويد عادي. ليس على متجر Play؛ تثبّت ملف APK بنفسك.</p>
+  <p class="sub">مسار تطبيق أندرويد عادي. ليس على متجر Play؛ تحمّل ملف APK برمز تحصل عليه من المطوّر وتثبّته بنفسك.</p>
   <ol class="steps">
-    <li><b>حمّل</b> <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">masar.apk</a> على شاشة السيارة، أو انقله بفلاش USB.</li>
+    <li><b>أدخل رمز التحميل</b> في أعلى هذه الصفحة من متصفح شاشة السيارة لتنزيل الملف، أو نزّله على جهاز آخر وانقله بفلاش USB. الرمز يعمل لتحميل واحد.</li>
     <li><b>افتح الملف</b> واسمح بالتثبيت من هذا المصدر عندما يطلب أندرويد ذلك.</li>
     <li><b>اضغط زر الرئيسية</b> واختر «مسار» ثم «دائماً».</li>
     <li><b>اسمح بالموقع</b> عند الطلب، للسرعة والخريطة ومواقيت الصلاة. ولشريط الرئيسية اسمح بـ«الظهور فوق التطبيقات الأخرى».</li>
@@ -154,20 +160,34 @@ footer b{color:var(--text);font-weight:600}
 
 <footer>
   <div><b>مسار</b> · Masar · تطوير عمّار</div>
-  <div><a href="https://masar.ammarhussein.cloud">masar.ammarhussein.cloud</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases">كل الإصدارات</a></div>
+  <div><a href="https://masar.ammarhussein.cloud">masar.ammarhussein.cloud</a></div>
 </footer>
 
 </div>
 <script>
-// Show the current version next to the download button.
-fetch('https://api.github.com/repos/ammarhussein5481-hash/masar-launcher/releases/latest')
-  .then(function (r) { return r.ok ? r.json() : null; })
-  .then(function (d) {
-    if (!d || !d.tag_name) return;
-    var when = new Date(d.published_at).toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
-    document.getElementById('ver').textContent = 'الإصدار ' + d.tag_name.replace(/^v/, '') + ' · ' + when + ' · مجاني ومفتوح المصدر · أندرويد 8 وما بعده';
-  })
-  .catch(function () {});
+// The current version, and the code box: check the code, then start the download.
+fetch('/api/version').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+  if (!d || !d.version) return;
+  var when = new Date(d.published).toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
+  document.getElementById('ver').textContent = 'الإصدار ' + d.version + ' · ' + when + ' · التحميل برمز · أندرويد 8 وما بعده';
+}).catch(function () {});
+var form = document.getElementById('gate'), box = document.getElementById('code'), msg = document.getElementById('gatemsg');
+form.addEventListener('submit', function (e) {
+  e.preventDefault();
+  var code = box.value.trim();
+  msg.style.color = '';
+  if (!code) { msg.textContent = 'أدخل الرمز أولاً.'; return; }
+  fetch('/api/check?code=' + encodeURIComponent(code)).then(function (r) {
+    if (r.status === 429) { msg.textContent = 'محاولات كثيرة. حاول بعد قليل.'; return null; }
+    return r.json();
+  }).then(function (d) {
+    if (!d) return;
+    if (!d.ok) { msg.textContent = 'هذا الرمز غير صحيح أو سبق استخدامه.'; return; }
+    msg.style.color = '#3DDC84';
+    msg.textContent = 'بدأ التحميل. افتح الملف لتثبيته.';
+    window.location.href = '/download?code=' + encodeURIComponent(code);
+  }).catch(function () { msg.textContent = 'تعذّر الاتصال. حاول مرة أخرى.'; });
+});
 </script>
 </body>
 </html>
