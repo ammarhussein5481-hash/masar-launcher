@@ -7,8 +7,8 @@
     <string name="add_app">أضف تطبيقاً</string>
     <string name="unit_kmh">كم/س</string>
     <string name="net_online">متصل</string>
-    <string name="net_no_internet">متصل، لا يوجد إنترنت</string>
-    <string name="net_offline">غير متصل</string>
+    <string name="net_no_internet">لا يوجد إنترنت · المس للواي فاي</string>
+    <string name="net_offline">غير متصل · المس للواي فاي</string>
     <string name="gps_tap">المس لتشغيل السرعة</string>
     <string name="gps_searching">جارٍ البحث عن GPS</string>
     <string name="gps_off">GPS متوقف</string>

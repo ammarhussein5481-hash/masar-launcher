@@ -212,6 +212,7 @@ class MainActivity : Activity(), DashCam.Listener {
         unit = findViewById(R.id.unit)
         statusGps = findViewById(R.id.statusGps)
         statusNet = findViewById(R.id.statusNet)
+        statusNet.setOnClickListener { reconnectWifi() }
         statusHandle = findViewById(R.id.statusHandle)
         grid = findViewById(R.id.grid)
 
@@ -2151,6 +2152,25 @@ class MainActivity : Activity(), DashCam.Listener {
 
         override fun onLost(network: Network) {
             ui.post { setNet(NET_OFFLINE) }
+        }
+    }
+
+    /**
+     * A tap on the internet line: look for known Wi-Fi networks right now, and
+     * open Android's Wi-Fi sheet so the hotspot is one tap away. An app may not
+     * pick the network itself, but this skips waiting for the next routine scan.
+     */
+    @Suppress("DEPRECATION")
+    private fun reconnectWifi() {
+        try {
+            (applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager).startScan()
+        } catch (ex: Exception) {
+            // Scans are rationed; the sheet below scans by itself anyway
+        }
+        try {
+            startActivity(Intent(Settings.Panel.ACTION_WIFI))
+        } catch (ex: Exception) {
+            open(Intent(Settings.ACTION_WIFI_SETTINGS), getString(R.string.app_name))
         }
     }
 
