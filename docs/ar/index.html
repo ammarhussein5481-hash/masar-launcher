@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مسار · واجهة رئيسية لشاشات السيارات</title>
+<meta name="description" content="مسار واجهة رئيسية مجانية ومفتوحة المصدر لشاشات أندرويد في السيارات: خانات كبيرة، السرعة من GPS، بيانات المحرك مباشرة من قطعة OBD، وشريط للعودة للرئيسية يعمل فوق كاربلاي.">
+<meta property="og:title" content="مسار · واجهة رئيسية لشاشات السيارات">
+<meta property="og:description" content="خانات كبيرة، السرعة، بيانات المحرك مباشرة، وطريق للعودة من كاربلاي. مجاني ومفتوح المصدر.">
+<meta property="og:image" content="https://masar.ammarhussein.cloud/img/home.png">
+<link rel="alternate" hreflang="en" href="https://masar.ammarhussein.cloud/">
+<link rel="alternate" hreflang="ar" href="https://masar.ammarhussein.cloud/ar/">
+<meta name="theme-color" content="#0A0C0F">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23FFB020'/%3E%3Cpath d='M16 46V18h6l10 16 10-16h6v28h-6V29l-10 15-10-15v17z' fill='%231A1205'/%3E%3C/svg%3E">
+<style>
+:root{--bg:#0A0C0F;--tile:#151A21;--stroke:#222A35;--text:#F2F4F7;--dim:#9AA4B2;--idle:#5B6573;--accent:#FFB020;--on-accent:#1A1205;--ok:#3DDC84}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font:17px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+header{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+.brand{display:flex;align-items:center;gap:12px;font-weight:600;font-size:20px;color:var(--text)}
+.brand i{width:34px;height:34px;border-radius:9px;background:var(--accent);display:grid;place-items:center;color:var(--on-accent);font-style:normal;font-weight:700}
+.brand span{color:var(--dim);font-weight:400}
+nav a{color:var(--dim);margin-inline-start:22px;font-size:15px}
+nav a:hover{color:var(--text);text-decoration:none}
+.hero{padding:56px 0 30px;display:grid;grid-template-columns:1fr;gap:34px}
+h1{font-size:clamp(38px,6.4vw,68px);line-height:1.04;font-weight:300;letter-spacing:-1.5px;max-width:15ch}
+h1 b{font-weight:300;color:var(--accent)}
+.lead{color:var(--dim);font-size:clamp(17px,2vw,20px);max-width:58ch;margin-top:18px}
+.cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:28px}
+.btn{display:inline-flex;align-items:center;gap:10px;border-radius:16px;padding:14px 24px;font-weight:600;font-size:17px}
+.btn:hover{text-decoration:none;filter:brightness(1.08)}
+.primary{background:var(--accent);color:var(--on-accent)}
+.ghost{border:1.5px solid var(--stroke);color:var(--text);background:var(--tile)}
+.ver{color:var(--idle);font-size:14px}
+.shot{border-radius:22px;border:1.5px solid var(--stroke);overflow:hidden;background:var(--tile);box-shadow:0 30px 80px #000a}
+.shot img{display:block;width:100%;height:auto}
+section{padding:64px 0 0}
+h2{font-size:clamp(26px,3.4vw,36px);font-weight:400;letter-spacing:-.4px}
+.sub{color:var(--dim);margin-top:8px;max-width:62ch}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-top:28px}
+.card{background:var(--tile);border:1.5px solid var(--stroke);border-radius:22px;padding:22px}
+.card h3{font-size:18px;font-weight:600;margin-bottom:6px}
+.card p{color:var(--dim);font-size:15.5px;line-height:1.55}
+.card .k{display:inline-block;color:var(--accent);font-size:13px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px}
+.tour{display:grid;gap:44px;margin-top:34px}
+.row{display:grid;grid-template-columns:1fr;gap:20px;align-items:center}
+.row h3{font-size:22px;font-weight:500}
+.row p{color:var(--dim);margin-top:8px}
+.row ul{color:var(--dim);margin:10px 0 0;padding-inline-start:20px;font-size:16px}
+.row li{margin:4px 0}
+ol.steps{counter-reset:s;list-style:none;padding:0;margin-top:26px;display:grid;gap:12px}
+ol.steps li{counter-increment:s;background:var(--tile);border:1.5px solid var(--stroke);border-radius:18px;padding:16px 18px;padding-inline-start:62px;position:relative;color:var(--dim)}
+ol.steps li::before{content:counter(s);position:absolute;inset-inline-start:18px;top:15px;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:700;font-size:15px}
+ol.steps b{color:var(--text);font-weight:600}
+code{font:14.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0f1319;border:1px solid var(--stroke);border-radius:8px;padding:2px 7px;color:var(--text);word-break:break-all}
+.note{color:var(--idle);font-size:14.5px;margin-top:14px;max-width:70ch}
+footer{margin-top:80px;border-top:1.5px solid var(--stroke);padding:30px 0 46px;color:var(--dim);font-size:15px;display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-between}
+footer b{color:var(--text);font-weight:600}
+@media(min-width:880px){
+  .hero{grid-template-columns:5fr 6fr;align-items:center;padding-top:70px}
+  .row{grid-template-columns:5fr 7fr;gap:40px}
+  .row.flip{grid-template-columns:7fr 5fr}
+  .row.flip .txt{order:2}
+}
+@media(max-width:560px){nav a:not(.keep){display:none}}
+[lang=ar] body{font-family:"Noto Sans Arabic","Geeza Pro","Segoe UI",Tahoma,system-ui,sans-serif;line-height:1.8}
+[lang=ar] h1,[lang=ar] h2{letter-spacing:0}
+[lang=ar] h1{line-height:1.25;max-width:18ch}
+[lang=ar] .card .k{letter-spacing:0}
+[lang=ar] code{direction:ltr;unicode-bidi:isolate;display:inline-block}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <a class="brand" href="/ar/"><i>M</i>مسار <span>Masar</span></a>
+  <nav>
+    <a href="#features">المزايا</a>
+    <a href="#tour">جولة</a>
+    <a href="#install">التثبيت</a>
+    <a class="keep" href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a>
+    <a class="keep" href="/" lang="en">English</a>
+  </nav>
+</header>
+
+<div class="hero">
+  <div>
+    <h1>الواجهة التي <b>كان يجب أن تأتي</b> مع شاشة سيارتك.</h1>
+    <p class="lead">مسار واجهة رئيسية لشاشات أندرويد في السيارات. خانات كبيرة تضغطها دون أن تنظر، سرعتك وموعد الصلاة القادمة بنظرة واحدة، بيانات المحرك مباشرة من قطعة OBD، وطريق للعودة إلى الرئيسية من كاربلاي.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">حمّل التطبيق (APK)</a>
+      <a class="btn ghost" href="https://github.com/ammarhussein5481-hash/masar-launcher">الكود على GitHub</a>
+    </div>
+    <p class="ver" id="ver">مجاني ومفتوح المصدر · أندرويد 8 وما بعده</p>
+  </div>
+  <div class="shot"><img src="../img/home.png" width="1200" height="720" alt="الصفحة الرئيسية في مسار: الساعة والسرعة والصلاة القادمة وثماني خانات كبيرة للتطبيقات"></div>
+</div>
+
+<section id="features">
+  <h2>مصمَّم لشاشة تقرؤها وأنت على سرعة 120 كم/س</h2>
+  <p class="sub">كل المقاسات مأخوذة من الشاشة نفسها، فيظهر بالشكل ذاته على أي شاشة. بلا حساب، بلا إعلانات، بلا تتبّع.</p>
+  <div class="grid">
+    <div class="card"><span class="k">الرئيسية</span><h3>ثماني أو اثنتا عشرة خانة كبيرة</h3><p>تطبيقاتك، وكاربلاي في المقدمة. اضغط مطوّلاً على أي خانة لتغييرها. وعلى الجانب: الساعة والتاريخ والسرعة والاتجاه من GPS.</p></div>
+    <div class="card"><span class="k">فوق أي تطبيق</span><h3>شريط يظهر عند اللمس</h3><p>المس الشاشة في كاربلاي أو الخريطة فيظهر شريط فيه الرئيسية والرجوع والصوت وتطبيقاتك لبضع ثوانٍ، ثم يختفي.</p></div>
+    <div class="card"><span class="k">السيارة</span><h3>بيانات المحرك مباشرة</h3><p>مع قطعة OBD بلوتوث: دورات المحرك، حرارة المحرك والقير، البطارية، الوقود، الاستهلاك، وأكواد الأعطال بكلمات مفهومة.</p></div>
+    <div class="card"><span class="k">تنبيهات</span><h3>ينبّهك أينما كنت</h3><p>ارتفاع حرارة المحرك أو القير، خلل في الشحن، إطار منخفض الضغط أو كود عطل جديد: شريط أحمر فوق أي شيء معروض على الشاشة.</p></div>
+    <div class="card"><span class="k">القيادة</span><h3>بوصلة وخريطة وطقس</h3><p>بوصلة تدور مع اتجاه السير، خريطة صغيرة تتبع السيارة، وتوقعات الطقس لثلاثة أيام في موقعك.</p></div>
+    <div class="card"><span class="k">الرحلات</span><h3>المسافة والوقود والتكلفة</h3><p>كل مشوار يُحسب تلقائياً: المسافة والوقت والمتوسط والوقود المستهلك وتكلفته. وتُحفظ الرحلات السابقة مع مكان انتهاء كل رحلة.</p></div>
+    <div class="card"><span class="k">يومياً</span><h3>مواقيت الصلاة بلا إنترنت</h3><p>الصلاة القادمة والوقت المتبقي لها، تُحسب على الجهاز نفسه وفق تقويم أم القرى. لا حاجة للإنترنت.</p></div>
+    <div class="card"><span class="k">على ذوقك</span><h3>العربية، تعتيم ليلي، وألوان</h3><p>عربي أو إنجليزي، تعتيم بعد الغروب حتى لا تبهرك الشاشة، ستة ألوان وصورة خلفية من اختيارك.</p></div>
+  </div>
+</section>
+
+<section id="tour">
+  <h2>ثلاث صفحات، بينها سحبة واحدة</h2>
+  <div class="tour">
+    <div class="row">
+      <div class="txt"><h3>القيادة</h3><p>ما حولك.</p><ul><li>بوصلة تدور مع السيارة</li><li>خريطة من OpenStreetMap؛ المسها لفتح تطبيق الخرائط</li><li>الطقس من Open-Meteo، ويُقرَّب موقعك قبل إرساله</li><li>مسافة هذه الرحلة ووقتها وسرعاتها</li></ul></div>
+      <div class="shot"><img loading="lazy" src="../img/drive.png" width="1200" height="720" alt="صفحة القيادة: بوصلة وخريطة وطقس"></div>
+    </div>
+    <div class="row flip">
+      <div class="txt"><h3>السيارة</h3><p>ما يفعله المحرك الآن، يُقرأ عبر قطعة ELM327 بلوتوث عادي في منفذ OBD.</p><ul><li>القراءة التي لا توفرها السيارة لا تظهر لها خانة</li><li>استهلاك الوقود لحظياً ولكل رحلة، والمدى المتبقي، والتكلفة بسعر البنزين الذي تحدده</li><li>أكواد الأعطال مع وصفها، وزر لمسحها</li><li>عمر الزيت وتذكيرات الصيانة</li></ul></div>
+      <div class="shot"><img loading="lazy" src="../img/car.png" width="1200" height="720" alt="صفحة السيارة: عداد الدورات وقراءات المحرك وأكواد الأعطال والرحلة والصيانة"></div>
+    </div>
+    <div class="row">
+      <div class="txt"><h3>شريط الرئيسية</h3><p>التطبيقات التي تملأ الشاشة تُخفي أزرار الجهاز. مسار يعيدها لك عندما تطلبها فقط.</p><ul><li>المس أي مكان: يظهر الشريط أربع ثوانٍ</li><li>الرئيسية، الرجوع، التطبيقات الأخيرة، الصوت، وأول ثلاثة من تطبيقاتك</li><li>أو زر صغير بدلاً منه إن أحببت</li></ul></div>
+      <div class="shot"><img loading="lazy" src="../img/bar.png" width="1200" height="720" alt="شريط الرئيسية ظاهراً فوق تطبيق الملاحة"></div>
+    </div>
+    <div class="row flip">
+      <div class="txt"><h3>التنبيهات</h3><p>يواصل مسار مراقبة السيارة وكاربلاي في الواجهة، ولا ينبّهك إلا إذا تجاوز شيءٌ حدّه الطبيعي.</p><ul><li>صفارة واحدة عند بدء التنبيه</li><li>يبقى الشريط حتى تعود القيمة إلى طبيعتها</li><li>تنبيه السرعة عند الحد الذي تختاره</li></ul></div>
+      <div class="shot"><img loading="lazy" src="../img/warning.png" width="1200" height="720" alt="شريط تنبيه أحمر فوق تطبيق الملاحة"></div>
+    </div>
+  </div>
+  <p class="note">الصور تصاميم توضيحية بمقاس 1200 × 720 وبأرقام للمثال، والتطبيق فيها بالإنجليزية. ما يظهر لك يعتمد على شاشتك وسيارتك وقطعة OBD.</p>
+</section>
+
+<section id="install">
+  <h2>التثبيت</h2>
+  <p class="sub">مسار تطبيق أندرويد عادي. ليس على متجر Play؛ تثبّت ملف APK بنفسك.</p>
+  <ol class="steps">
+    <li><b>حمّل</b> <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases/latest/download/masar.apk">masar.apk</a> على شاشة السيارة، أو انقله بفلاش USB.</li>
+    <li><b>افتح الملف</b> واسمح بالتثبيت من هذا المصدر عندما يطلب أندرويد ذلك.</li>
+    <li><b>اضغط زر الرئيسية</b> واختر «مسار» ثم «دائماً».</li>
+    <li><b>اسمح بالموقع</b> عند الطلب، للسرعة والخريطة ومواقيت الصلاة. ولشريط الرئيسية اسمح بـ«الظهور فوق التطبيقات الأخرى».</li>
+    <li><b>اضغط مطوّلاً على الساعة</b> لفتح الإعدادات، ومنها اللغة العربية. ولبيانات المحرك اقرن قطعة ELM327 بلوتوث من إعدادات البلوتوث في الجهاز، ثم اسحب إلى صفحة السيارة.</li>
+  </ol>
+  <p class="note">من الكمبيوتر: <code>adb install -r masar.apk</code>. وللتراجع اختر واجهة أخرى من الإعدادات ← التطبيقات ← التطبيقات الافتراضية ← تطبيق الشاشة الرئيسية. جُرِّب على شاشة أندرويد 10 بمقاس 1200 × 720؛ يُفترض أن يعمل على غيرها لكنه لم يُجرَّب.</p>
+</section>
+
+<footer>
+  <div><b>مسار</b> · Masar · تطوير عمّار</div>
+  <div><a href="https://masar.ammarhussein.cloud">masar.ammarhussein.cloud</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher">GitHub</a> · <a href="https://github.com/ammarhussein5481-hash/masar-launcher/releases">كل الإصدارات</a></div>
+</footer>
+
+</div>
+<script>
+// Show the current version next to the download button.
+fetch('https://api.github.com/repos/ammarhussein5481-hash/masar-launcher/releases/latest')
+  .then(function (r) { return r.ok ? r.json() : null; })
+  .then(function (d) {
+    if (!d || !d.tag_name) return;
+    var when = new Date(d.published_at).toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
+    document.getElementById('ver').textContent = 'الإصدار ' + d.tag_name.replace(/^v/, '') + ' · ' + when + ' · مجاني ومفتوح المصدر · أندرويد 8 وما بعده';
+  })
+  .catch(function () {});
+</script>
+</body>
+</html>
