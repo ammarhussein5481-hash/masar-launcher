@@ -211,7 +211,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
                     cm.bindProcessToNetwork(network)
                     listener.onCamState(JOINED, -1)
                     // A moment for the camera to hand out an address before asking for video.
-                    ui.postDelayed({ if (isOpen && this.live) { play(0); play(1) } }, 800)
+                    ui.postDelayed({ if (isOpen && this@DashCam.live) { play(0); play(1) } }, 800)
                 }
             }
 
