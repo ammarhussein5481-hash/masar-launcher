@@ -1397,10 +1397,24 @@ class MainActivity : Activity(), DashCam.Listener {
             if (clip.rear) {
                 badge.setText(R.string.cam_rear)
                 badge.setBackgroundColor(getColor(R.color.tile_stroke))
-                badge.setTextColor(getColor(R.color.text))
                 badge.visibility = View.VISIBLE
             } else {
                 badge.visibility = View.GONE
+            }
+            // Thumbnail: sized to the screen, cached, loaded in the background.
+            val thumb = view.findViewById<ImageView>(R.id.clipThumb)
+            val tw = (u * 18f).roundToInt()
+            val th = tw * 9 / 16
+            thumb.layoutParams = thumb.layoutParams.apply { width = tw; height = th }
+            thumb.tag = clip.name
+            val ready = ClipThumbs.cached(clip.name)
+            if (ready != null) {
+                thumb.setImageBitmap(ready)
+            } else {
+                thumb.setImageResource(R.drawable.ic_film)
+                ClipThumbs.request(clip, tw, th) { bitmap ->
+                    if (thumb.tag == clip.name) thumb.setImageBitmap(bitmap)
+                }
             }
             return view
         }

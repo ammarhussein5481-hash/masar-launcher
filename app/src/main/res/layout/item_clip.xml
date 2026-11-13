@@ -5,19 +5,38 @@
     android:background="@drawable/tile_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingTop="12dp"
-    android:paddingEnd="16dp"
-    android:paddingBottom="12dp">
+    android:padding="8dp">
 
-    <TextView
-        android:id="@+id/clipTime"
+    <ImageView
+        android:id="@+id/clipThumb"
+        android:layout_width="96dp"
+        android:layout_height="54dp"
+        android:background="@color/tile_stroke"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ic_film" />
+
+    <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
         android:layout_weight="1"
-        android:fontFamily="sans-serif-medium"
-        android:maxLines="1"
-        android:textColor="@color/text" />
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/clipTime"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:textColor="@color/text" />
+
+        <TextView
+            android:id="@+id/clipSize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:maxLines="1"
+            android:textColor="@color/text_dim" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/clipBadge"
@@ -25,14 +44,8 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
         android:maxLines="1"
-        android:textColor="@color/on_accent"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:textColor="@color/text"
         android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/clipSize"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
-        android:maxLines="1"
-        android:textColor="@color/text_dim" />
 </LinearLayout>
