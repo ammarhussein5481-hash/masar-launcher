@@ -59,13 +59,16 @@ class DashCam(private val context: Context, private val listener: Listener) {
     private var addedId = -1
     private var joined = false
     private var tries = 0
+    /** Whether to play the live streams once joined. Clips mode joins without them. */
+    private var live = true
 
     var isOpen = false
         private set
 
-    fun open(ssidPrefix: String, password: String, front: TextureView, rear: TextureView) {
+    fun open(ssidPrefix: String, password: String, front: TextureView, rear: TextureView, live: Boolean = true) {
         if (isOpen) return
         isOpen = true
+        this.live = live
         views[0] = front
         views[1] = rear
         // Already on the camera's Wi-Fi (joined by hand in Settings)? Then there
@@ -74,7 +77,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
         if (already != null) {
             cm.bindProcessToNetwork(already)
             listener.onCamState(JOINED, -1)
-            ui.postDelayed({ if (isOpen) { play(0); play(1) } }, 300)
+            ui.postDelayed({ if (isOpen && this.live) { play(0); play(1) } }, 300)
             return
         }
         listener.onCamState(JOINING, -1)
@@ -148,7 +151,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
             joined = true
             cm.bindProcessToNetwork(network)
             listener.onCamState(JOINED, -1)
-            ui.postDelayed({ if (isOpen) { play(0); play(1) } }, 500)
+            ui.postDelayed({ if (isOpen && this.live) { play(0); play(1) } }, 500)
             ui.postDelayed({ watchLink(ssidPrefix) }, 4000)
             return
         }
@@ -208,7 +211,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
                     cm.bindProcessToNetwork(network)
                     listener.onCamState(JOINED, -1)
                     // A moment for the camera to hand out an address before asking for video.
-                    ui.postDelayed({ if (isOpen) { play(0); play(1) } }, 800)
+                    ui.postDelayed({ if (isOpen && this.live) { play(0); play(1) } }, 800)
                 }
             }
 
@@ -275,6 +278,21 @@ class DashCam(private val context: Context, private val listener: Listener) {
         player.playWhenReady = true
         player.prepare()
         listener.onCamState(STARTING, pane)
+    }
+
+    /** Stops the live streams but keeps the camera's Wi-Fi, for switching to the clip list. */
+    fun stopLive() {
+        live = false
+        stop(0)
+        stop(1)
+    }
+
+    /** Starts the live streams again after the clip list, if the camera is still joined. */
+    fun startLive() {
+        if (!isOpen) return
+        live = true
+        play(0)
+        play(1)
     }
 
     private fun again(pane: Int) {

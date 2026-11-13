@@ -41,11 +41,15 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
+import android.widget.ListView
 import android.widget.GridView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -104,6 +108,14 @@ class MainActivity : Activity(), DashCam.Listener {
     /** Which camera pane fills the page: -1 for both side by side. */
     private var camBig = -1
     private val camPlaying = BooleanArray(2)
+    /** 0 live view, 1 the clip list, 2 one clip playing. */
+    private var camMode = CAM_LIVE
+    /** Set when the camera is being opened to go straight to the clip list. */
+    private var camWantClips = false
+    private var camClipsLoaded = false
+    private var camTab = 0
+    private val camClips = arrayOf<List<Clip>>(emptyList(), emptyList())
+    private var clipPlayer: ExoPlayer? = null
     private lateinit var pages: List<View>
     private lateinit var dots: List<View>
     private lateinit var carStatus: TextView
@@ -249,6 +261,15 @@ class MainActivity : Activity(), DashCam.Listener {
                     video.post { video.layoutParams = params }
                 }
             }
+        }
+        findViewById<View>(R.id.camClips).setOnClickListener { toggleClips() }
+        findViewById<View>(R.id.camTabNormal).setOnClickListener { showClipTab(0) }
+        findViewById<View>(R.id.camTabEvent).setOnClickListener { showClipTab(1) }
+        findViewById<View>(R.id.camPlayerBack).setOnClickListener { stopClipPlayer(); camShow(CAM_CLIPS) }
+        val clipList = findViewById<ListView>(R.id.camList)
+        clipList.adapter = clipAdapter
+        clipList.setOnItemClickListener { _, _, position, _ ->
+            (camClips[camTab].getOrNull(position))?.let { playClip(it) }
         }
         onCamState(DashCam.CLOSED, -1)
         carStatus = findViewById(R.id.carStatus)
@@ -453,6 +474,7 @@ class MainActivity : Activity(), DashCam.Listener {
         HandleService.homeVisible = false
         stopGps()
         stopMedia()
+        stopClipPlayer()
         dashCam.close()
         ui.removeCallbacks(carTick)
         if (phoneListening) {
@@ -550,7 +572,10 @@ class MainActivity : Activity(), DashCam.Listener {
         if (index == 1) refreshWeather(false)
         if (index == 2) renderCar()
         // Leaving the camera page gives the Wi-Fi back to the hotspot.
-        if (index != 3 && from == 3) dashCam.close()
+        if (index != 3 && from == 3) {
+            stopClipPlayer()
+            dashCam.close()
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -1259,7 +1284,7 @@ class MainActivity : Activity(), DashCam.Listener {
     // ---------------------------------------------------------------- dash cam page
 
     /** Asks for the camera's Wi-Fi name and password the first time, then joins it. */
-    private fun openCamera() {
+    private fun openCamera(live: Boolean = true) {
         if (prefs.getString("cam_pass", "").isNullOrEmpty()) {
             cameraSetup(true)
             return
@@ -1274,8 +1299,133 @@ class MainActivity : Activity(), DashCam.Listener {
         dashCam.open(
             prefs.getString("cam_ssid", "70mai") ?: "70mai",
             prefs.getString("cam_pass", "") ?: "",
-            findViewById(R.id.camFront), findViewById(R.id.camRear)
+            findViewById(R.id.camFront), findViewById(R.id.camRear),
+            live
         )
+    }
+
+    // ---------------------------------------------------------------- clips
+
+    /** Shows one of the camera page's three faces: live, the clip list, a clip playing. */
+    private fun camShow(mode: Int) {
+        camMode = mode
+        findViewById<View>(R.id.camPanes).visibility = if (mode == CAM_LIVE) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.camListBox).visibility = if (mode == CAM_CLIPS) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.camPlayerBox).visibility = if (mode == CAM_PLAYING) View.VISIBLE else View.GONE
+        (findViewById<TextView>(R.id.camClips)).setText(if (mode == CAM_LIVE) R.string.cam_clips else R.string.cam_live_btn)
+    }
+
+    /** The Clips/Live button: switch the camera page between the live view and the recordings. */
+    private fun toggleClips() {
+        if (!dashCam.isOpen) {
+            // Open the camera straight into the clip list, without the live streams.
+            camWantClips = true
+            camClipsLoaded = false
+            openCamera(live = false)
+            return
+        }
+        if (camMode == CAM_LIVE) {
+            dashCam.stopLive()
+            camShow(CAM_CLIPS)
+            if (!camClipsLoaded) fetchClips()
+        } else {
+            stopClipPlayer()
+            camShow(CAM_LIVE)
+            dashCam.startLive()
+        }
+    }
+
+    /** Reads both clip lists off the main thread, with the camera's required gap between calls. */
+    private fun fetchClips() {
+        findViewById<TextView>(R.id.camListEmpty).setText(R.string.cam_list_loading)
+        findViewById<View>(R.id.camListEmpty).visibility = View.VISIBLE
+        Thread {
+            val normal = try {
+                DashcamClips.list("Normal")
+            } catch (ex: Exception) {
+                null
+            }
+            // The camera drops requests that come too close together.
+            try {
+                Thread.sleep(3000)
+            } catch (ex: InterruptedException) {
+                // Carry on
+            }
+            val event = try {
+                DashcamClips.list("Event")
+            } catch (ex: Exception) {
+                null
+            }
+            runOnUiThread {
+                if (camMode == CAM_LIVE) return@runOnUiThread
+                camClips[0] = normal ?: emptyList()
+                camClips[1] = event ?: emptyList()
+                camClipsLoaded = normal != null || event != null
+                showClipTab(camTab)
+            }
+        }.start()
+    }
+
+    private fun showClipTab(tab: Int) {
+        camTab = tab
+        findViewById<TextView>(R.id.camTabNormal).setTextColor(getColor(if (tab == 0) R.color.text else R.color.text_dim))
+        findViewById<TextView>(R.id.camTabEvent).setTextColor(getColor(if (tab == 1) R.color.text else R.color.text_dim))
+        clipAdapter.notifyDataSetChanged()
+        val empty = findViewById<TextView>(R.id.camListEmpty)
+        if (camClips[tab].isEmpty()) {
+            empty.setText(if (camClipsLoaded) R.string.cam_list_empty else R.string.cam_list_fail)
+            empty.visibility = View.VISIBLE
+        } else {
+            empty.visibility = View.GONE
+        }
+    }
+
+    private val clipAdapter = object : BaseAdapter() {
+        override fun getCount(): Int = camClips[camTab].size
+        override fun getItem(position: Int): Any = camClips[camTab][position]
+        override fun getItemId(position: Int): Long = position.toLong()
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = convertView ?: layoutInflater.inflate(R.layout.item_clip, parent, false)
+            val clip = camClips[camTab][position]
+            val time = view.findViewById<TextView>(R.id.clipTime)
+            time.text = clip.time.ifEmpty { clip.name.substringAfterLast('/') }
+            px(time, 3.8f)
+            val size = view.findViewById<TextView>(R.id.clipSize)
+            size.text = String.format(Locale.US, "%.0f MB", clip.sizeBytes / 1_000_000.0)
+            px(size, 3.2f)
+            val badge = view.findViewById<TextView>(R.id.clipBadge)
+            if (clip.rear) {
+                badge.setText(R.string.cam_rear)
+                badge.setBackgroundColor(getColor(R.color.tile_stroke))
+                badge.setTextColor(getColor(R.color.text))
+                badge.visibility = View.VISIBLE
+            } else {
+                badge.visibility = View.GONE
+            }
+            return view
+        }
+    }
+
+    private fun playClip(clip: Clip) {
+        stopClipPlayer()
+        camShow(CAM_PLAYING)
+        val player = ExoPlayer.Builder(this).build()
+        clipPlayer = player
+        findViewById<PlayerView>(R.id.camPlayer).player = player
+        player.setMediaItem(MediaItem.fromUri(clip.url))
+        player.playWhenReady = true
+        player.prepare()
+    }
+
+    private fun stopClipPlayer() {
+        val player = clipPlayer ?: return
+        clipPlayer = null
+        try {
+            findViewById<PlayerView>(R.id.camPlayer).player = null
+            player.release()
+        } catch (ex: Exception) {
+            // Already released
+        }
     }
 
     /** The camera's Wi-Fi name (or how it starts) and its password. Kept only on this unit. */
@@ -1328,6 +1478,16 @@ class MainActivity : Activity(), DashCam.Listener {
         if (!open) {
             camPlaying[0] = false
             camPlaying[1] = false
+            camClipsLoaded = false
+            camClips[0] = emptyList()
+            camClips[1] = emptyList()
+            stopClipPlayer()
+            camShow(CAM_LIVE)
+        } else if (state == DashCam.JOINED && camWantClips) {
+            // Opened straight into the clip list.
+            camWantClips = false
+            camShow(CAM_CLIPS)
+            if (!camClipsLoaded) fetchClips()
         }
         // A picture that is not playing is hidden, so no frozen last frame is left on screen.
         findViewById<View>(R.id.camFront).alpha = if (camPlaying[0]) 1f else 0f
@@ -1561,6 +1721,11 @@ class MainActivity : Activity(), DashCam.Listener {
         px(trip, 3.4f)
 
         px(camStatus, 3.6f)
+        px(findViewById(R.id.camClips), 3.6f)
+        px(findViewById(R.id.camTabNormal), 3.6f)
+        px(findViewById(R.id.camTabEvent), 3.6f)
+        px(findViewById(R.id.camListEmpty), 3.6f)
+        px(findViewById(R.id.camPlayerBack), 3.4f)
         px(camButton, 3.8f)
         px(findViewById(R.id.camFrontLabel), 3.2f)
         px(findViewById(R.id.camRearLabel), 3.2f)
@@ -2205,6 +2370,9 @@ class MainActivity : Activity(), DashCam.Listener {
         private const val WEATHER_MOVE_M = 25_000f
 
         private const val REQUEST_PHOTO = 2
+        private const val CAM_LIVE = 0
+        private const val CAM_CLIPS = 1
+        private const val CAM_PLAYING = 2
         /** True once CarPlay has been opened automatically in this run of the unit. */
         private var autoOpened = false
         private const val WALLPAPER_FILE = "wallpaper.jpg"

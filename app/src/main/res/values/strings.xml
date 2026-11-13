@@ -211,4 +211,12 @@
     <string name="cam_ssid_hint">Wi-Fi name starts with</string>
     <string name="cam_pass_hint">Wi-Fi password</string>
     <string name="cam_pass_short">The password needs at least 8 characters</string>
+    <string name="cam_clips">Clips</string>
+    <string name="cam_live_btn">Live</string>
+    <string name="cam_tab_normal">Driving</string>
+    <string name="cam_tab_event">Events</string>
+    <string name="cam_list_loading">Reading the clips…</string>
+    <string name="cam_list_empty">No clips here</string>
+    <string name="cam_list_fail">Couldn\'t read the clips. Is the camera connected?</string>
+    <string name="cam_back_to_list">‹ Clips</string>
 </resources>
