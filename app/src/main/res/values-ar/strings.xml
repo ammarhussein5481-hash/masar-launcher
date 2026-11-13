@@ -212,4 +212,5 @@
     <string name="cam_list_empty">لا توجد مقاطع هنا</string>
     <string name="cam_list_fail">تعذّرت قراءة المقاطع. هل الكاميرا متصلة؟</string>
     <string name="cam_back_to_list">‹ المقاطع</string>
+    <string name="cam_connected">متصل</string>
 </resources>

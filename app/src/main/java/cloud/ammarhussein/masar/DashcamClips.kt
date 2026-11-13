@@ -1,5 +1,6 @@
 package cloud.ammarhussein.masar
 
+import android.net.Network
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -25,11 +26,15 @@ object DashcamClips {
     const val USER_AGENT = "Masar launcher"
     private const val BASE = "http://192.168.1.1"
 
-    /** The clips for one property (Normal, Event, NormalRear, Rear), newest first. Blocks. */
+    /**
+     * The clips for one property (Normal, Event, NormalRear, Rear), newest first.
+     * The request goes out [network] (the camera's Wi-Fi), because the unit's
+     * default network is the phone hotspot, which can't reach the camera. Blocks.
+     */
     @Throws(IOException::class)
-    fun list(property: String, count: Int = 50): List<Clip> {
+    fun list(network: Network?, property: String, count: Int = 50): List<Clip> {
         val url = URL("$BASE/cgi-bin/Config.cgi?action=dir&property=$property&format=all&count=$count&from=0")
-        val conn = url.openConnection() as HttpURLConnection
+        val conn = (network?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
         conn.setRequestProperty("User-Agent", USER_AGENT)

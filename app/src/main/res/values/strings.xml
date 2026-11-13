@@ -219,4 +219,5 @@
     <string name="cam_list_empty">No clips here</string>
     <string name="cam_list_fail">Couldn\'t read the clips. Is the camera connected?</string>
     <string name="cam_back_to_list">‹ Clips</string>
+    <string name="cam_connected">Connected</string>
 </resources>

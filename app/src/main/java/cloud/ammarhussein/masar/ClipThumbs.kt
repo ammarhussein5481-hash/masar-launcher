@@ -3,6 +3,7 @@ package cloud.ammarhussein.masar
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import android.net.Network
 import android.os.Handler
 import android.os.Looper
 import java.net.HttpURLConnection
@@ -41,7 +42,7 @@ object ClipThumbs {
      * and [onReady] is called on the main thread; a clip with no thumbnail calls
      * nothing. Safe to call for the same clip repeatedly.
      */
-    fun request(clip: Clip, w: Int, h: Int, onReady: (Bitmap) -> Unit) {
+    fun request(clip: Clip, network: Network?, w: Int, h: Int, onReady: (Bitmap) -> Unit) {
         val name = clip.name
         synchronized(this) {
             cache[name]?.let {
@@ -52,7 +53,7 @@ object ClipThumbs {
             inFlight.add(name)
         }
         worker.execute {
-            val bitmap = load(clip, w, h)
+            val bitmap = load(clip, network, w, h)
             synchronized(this) {
                 inFlight.remove(name)
                 if (bitmap != null) cache[name] = bitmap else failed.add(name)
@@ -67,9 +68,9 @@ object ClipThumbs {
         }
     }
 
-    private fun load(clip: Clip, w: Int, h: Int): Bitmap? {
+    private fun load(clip: Clip, network: Network?, w: Int, h: Int): Bitmap? {
         for (url in thumbUrls(clip.name)) {
-            fetchImage(url)?.let { return it }
+            fetchImage(network, url)?.let { return it }
         }
         return firstFrame(clip.url, w, h)
     }
@@ -85,10 +86,11 @@ object ClipThumbs {
         )
     }
 
-    private fun fetchImage(url: String): Bitmap? {
+    private fun fetchImage(network: Network?, url: String): Bitmap? {
         var conn: HttpURLConnection? = null
         return try {
-            conn = URL(url).openConnection() as HttpURLConnection
+            val target = URL(url)
+            conn = (network?.openConnection(target) ?: target.openConnection()) as HttpURLConnection
             conn.connectTimeout = 4000
             conn.readTimeout = 4000
             conn.setRequestProperty("User-Agent", DashcamClips.USER_AGENT)

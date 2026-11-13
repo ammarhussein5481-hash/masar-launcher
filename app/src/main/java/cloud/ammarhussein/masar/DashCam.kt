@@ -55,6 +55,10 @@ class DashCam(private val context: Context, private val listener: Listener) {
     private val retries = IntArray(2)
     private val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
+    /** The camera's network while joined, so callers can bind their own requests to it. */
+    var network: Network? = null
+        private set
+
     /** The network Masar added for the camera, or -1. It is removed again on close. */
     private var addedId = -1
     private var joined = false
@@ -75,6 +79,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
         // is nothing to ask Android for: use the connection as it is.
         val already = currentCameraNetwork(ssidPrefix)
         if (already != null) {
+            network = already
             cm.bindProcessToNetwork(already)
             listener.onCamState(JOINED, -1)
             ui.postDelayed({ if (isOpen && this.live) { play(0); play(1) } }, 300)
@@ -149,6 +154,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
         }
         if (network != null && ready) {
             joined = true
+            this.network = network
             cm.bindProcessToNetwork(network)
             listener.onCamState(JOINED, -1)
             ui.postDelayed({ if (isOpen && this.live) { play(0); play(1) } }, 500)
@@ -208,6 +214,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
                 ui.post {
                     if (!isOpen) return@post
                     // The camera has no internet, so Android would not route to it by itself.
+                    this@DashCam.network = network
                     cm.bindProcessToNetwork(network)
                     listener.onCamState(JOINED, -1)
                     // A moment for the camera to hand out an address before asking for video.
@@ -327,6 +334,7 @@ class DashCam(private val context: Context, private val listener: Listener) {
         if (!isOpen) return
         isOpen = false
         joined = false
+        network = null
         ui.removeCallbacksAndMessages(null)
         stop(0)
         stop(1)

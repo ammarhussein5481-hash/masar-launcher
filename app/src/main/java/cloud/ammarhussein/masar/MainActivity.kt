@@ -1335,27 +1335,17 @@ class MainActivity : Activity(), DashCam.Listener {
         }
     }
 
-    /** Reads both clip lists off the main thread, with the camera's required gap between calls. */
+    /** Reads both clip lists off the main thread, over the camera network, with the gap it needs. */
     private fun fetchClips() {
         findViewById<TextView>(R.id.camListEmpty).setText(R.string.cam_list_loading)
         findViewById<View>(R.id.camListEmpty).visibility = View.VISIBLE
+        val network = dashCam.network
         Thread {
-            val normal = try {
-                DashcamClips.list("Normal")
-            } catch (ex: Exception) {
-                null
-            }
-            // The camera drops requests that come too close together.
-            try {
-                Thread.sleep(3000)
-            } catch (ex: InterruptedException) {
-                // Carry on
-            }
-            val event = try {
-                DashcamClips.list("Event")
-            } catch (ex: Exception) {
-                null
-            }
+            // Live playback may have only just stopped; let the camera settle.
+            sleepMs(1200)
+            val normal = fetchOne(network, "Normal")
+            sleepMs(3000)
+            val event = fetchOne(network, "Event")
             runOnUiThread {
                 if (camMode == CAM_LIVE) return@runOnUiThread
                 camClips[0] = normal ?: emptyList()
@@ -1364,6 +1354,26 @@ class MainActivity : Activity(), DashCam.Listener {
                 showClipTab(camTab)
             }
         }.start()
+    }
+
+    /** One property, tried twice, because the camera sometimes drops the first request. */
+    private fun fetchOne(network: android.net.Network?, property: String): List<Clip>? {
+        for (attempt in 0 until 2) {
+            try {
+                return DashcamClips.list(network, property)
+            } catch (ex: Exception) {
+                sleepMs(2500)
+            }
+        }
+        return null
+    }
+
+    private fun sleepMs(ms: Long) {
+        try {
+            Thread.sleep(ms)
+        } catch (ex: InterruptedException) {
+            // Carry on
+        }
     }
 
     private fun showClipTab(tab: Int) {
@@ -1412,7 +1422,7 @@ class MainActivity : Activity(), DashCam.Listener {
                 thumb.setImageBitmap(ready)
             } else {
                 thumb.setImageResource(R.drawable.ic_film)
-                ClipThumbs.request(clip, tw, th) { bitmap ->
+                ClipThumbs.request(clip, dashCam.network, tw, th) { bitmap ->
                     if (thumb.tag == clip.name) thumb.setImageBitmap(bitmap)
                 }
             }
@@ -1507,6 +1517,11 @@ class MainActivity : Activity(), DashCam.Listener {
         findViewById<View>(R.id.camFront).alpha = if (camPlaying[0]) 1f else 0f
         findViewById<View>(R.id.camRear).alpha = if (camPlaying[1]) 1f else 0f
         camButton.setText(if (open) R.string.cam_close else R.string.cam_open)
+        if (open && camMode != CAM_LIVE) {
+            // Browsing or playing clips: the live-view wording doesn't apply.
+            setStatus(camStatus, getString(R.string.cam_connected), R.color.ok)
+            return
+        }
         when {
             state == DashCam.NOT_FOUND -> setStatus(camStatus, getString(R.string.cam_not_found), R.color.bad)
             state == DashCam.LOST -> setStatus(camStatus, getString(R.string.cam_lost), R.color.bad)
