@@ -39,7 +39,8 @@ object DashcamClips {
         conn.readTimeout = 8000
         conn.setRequestProperty("User-Agent", USER_AGENT)
         try {
-            if (conn.responseCode != 200) return emptyList()
+            val code = conn.responseCode
+            if (code != 200) throw IOException("HTTP $code")
             val body = conn.inputStream.bufferedReader().use { it.readText() }
             val event = property.startsWith("Event", ignoreCase = true)
             val clips = ArrayList<Clip>()
@@ -53,6 +54,27 @@ object DashcamClips {
             return clips
         } finally {
             conn.disconnect()
+        }
+    }
+
+    /** A short description of what the camera does for one dir request, for on-screen diagnosis. */
+    fun probe(network: Network?, property: String): String {
+        val url = URL("$BASE/cgi-bin/Config.cgi?action=dir&property=$property&format=all&count=3&from=0")
+        return try {
+            val conn = (network?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            conn.setRequestProperty("User-Agent", USER_AGENT)
+            val code = conn.responseCode
+            val head = try {
+                conn.inputStream.bufferedReader().use { it.readText() }.take(60).replace('\n', ' ')
+            } catch (ex: Exception) {
+                "(no body)"
+            }
+            conn.disconnect()
+            "HTTP $code · $head"
+        } catch (ex: Exception) {
+            ex.javaClass.simpleName + ": " + (ex.message ?: "")
         }
     }
 

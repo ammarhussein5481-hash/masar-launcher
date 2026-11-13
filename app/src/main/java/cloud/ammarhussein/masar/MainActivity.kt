@@ -114,6 +114,7 @@ class MainActivity : Activity(), DashCam.Listener {
     private var camWantClips = false
     private var camClipsLoaded = false
     private var camTab = 0
+    private var camDiag = ""
     private val camClips = arrayOf<List<Clip>>(emptyList(), emptyList())
     private var clipPlayer: ExoPlayer? = null
     private lateinit var pages: List<View>
@@ -1346,11 +1347,19 @@ class MainActivity : Activity(), DashCam.Listener {
             val normal = fetchOne(network, "Normal")
             sleepMs(3000)
             val event = fetchOne(network, "Event")
+            // If nothing came back, ask the camera one plain question for a reason to show.
+            val diag = if (normal == null && event == null) {
+                sleepMs(1500)
+                "net=" + (if (network == null) "none" else "ok") + " · " + DashcamClips.probe(network, "Normal")
+            } else {
+                ""
+            }
             runOnUiThread {
                 if (camMode == CAM_LIVE) return@runOnUiThread
                 camClips[0] = normal ?: emptyList()
                 camClips[1] = event ?: emptyList()
                 camClipsLoaded = normal != null || event != null
+                camDiag = diag
                 showClipTab(camTab)
             }
         }.start()
@@ -1383,7 +1392,11 @@ class MainActivity : Activity(), DashCam.Listener {
         clipAdapter.notifyDataSetChanged()
         val empty = findViewById<TextView>(R.id.camListEmpty)
         if (camClips[tab].isEmpty()) {
-            empty.setText(if (camClipsLoaded) R.string.cam_list_empty else R.string.cam_list_fail)
+            empty.text = when {
+                camClipsLoaded -> getString(R.string.cam_list_empty)
+                camDiag.isNotEmpty() -> getString(R.string.cam_list_fail) + "\n\n" + camDiag
+                else -> getString(R.string.cam_list_fail)
+            }
             empty.visibility = View.VISIBLE
         } else {
             empty.visibility = View.GONE
