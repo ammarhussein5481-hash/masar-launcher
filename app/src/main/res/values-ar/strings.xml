@@ -213,4 +213,7 @@
     <string name="cam_list_fail">تعذّرت قراءة المقاطع. هل الكاميرا متصلة؟</string>
     <string name="cam_back_to_list">‹ المقاطع</string>
     <string name="cam_connected">متصل</string>
+    <string name="cam_share">مشاركة</string>
+    <string name="cam_saving">جارٍ الحفظ… %1$d%%</string>
+    <string name="cam_save_failed">تعذّر حفظ المقطع</string>
 </resources>

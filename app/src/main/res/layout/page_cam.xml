@@ -241,6 +241,36 @@
                 android:paddingBottom="8dp"
                 android:text="@string/cam_back_to_list"
                 android:textColor="@color/text" />
+
+            <TextView
+                android:id="@+id/camShare"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="10dp"
+                android:background="@drawable/tile_bg_hero"
+                android:clickable="true"
+                android:focusable="true"
+                android:fontFamily="sans-serif-medium"
+                android:paddingStart="16dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="8dp"
+                android:text="@string/cam_share"
+                android:textColor="@color/on_accent" />
+
+            <TextView
+                android:id="@+id/camSave"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:background="#CC000000"
+                android:paddingStart="24dp"
+                android:paddingTop="16dp"
+                android:paddingEnd="24dp"
+                android:paddingBottom="16dp"
+                android:textColor="@color/text"
+                android:visibility="gone" />
         </FrameLayout>
     </FrameLayout>
 </LinearLayout>

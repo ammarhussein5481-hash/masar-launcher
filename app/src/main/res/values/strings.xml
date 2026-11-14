@@ -220,4 +220,7 @@
     <string name="cam_list_fail">Couldn\'t read the clips. Is the camera connected?</string>
     <string name="cam_back_to_list">‹ Clips</string>
     <string name="cam_connected">Connected</string>
+    <string name="cam_share">Share</string>
+    <string name="cam_saving">Saving… %1$d%%</string>
+    <string name="cam_save_failed">Couldn\'t save the clip</string>
 </resources>

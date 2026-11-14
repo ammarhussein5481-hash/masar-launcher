@@ -80,6 +80,41 @@ object DashcamClips {
         }
     }
 
+    /** Downloads one clip into [out] over the camera network, reporting 0..100. Blocks. Returns true on success. */
+    fun download(network: Network?, clip: Clip, out: java.io.OutputStream, onProgress: (Int) -> Unit): Boolean {
+        val url = URL(clip.url)
+        val conn = (network?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
+        conn.connectTimeout = 8000
+        conn.readTimeout = 20000
+        conn.setRequestProperty("User-Agent", USER_AGENT)
+        try {
+            if (conn.responseCode != 200) return false
+            val total = conn.contentLength.toLong().let { if (it > 0) it else clip.sizeBytes }
+            conn.inputStream.use { input ->
+                val buffer = ByteArray(64 * 1024)
+                var done = 0L
+                var last = -1
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    out.write(buffer, 0, read)
+                    done += read
+                    if (total > 0) {
+                        val pct = (done * 100 / total).toInt()
+                        if (pct != last) {
+                            last = pct
+                            onProgress(pct)
+                        }
+                    }
+                }
+            }
+            out.flush()
+            return true
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     private val FILE = Regex("<file>(.*?)</file>", RegexOption.DOT_MATCHES_ALL)
 
     private fun tag(block: String, name: String): String? =

@@ -27,11 +27,15 @@ import android.media.session.PlaybackState
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.content.ContentValues
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import android.text.format.DateFormat
 import android.util.TypedValue
@@ -116,6 +120,8 @@ class MainActivity : Activity(), DashCam.Listener {
     private var camTab = 0
     private var camDiag = ""
     private val camClips = arrayOf<List<Clip>>(emptyList(), emptyList())
+    private var camCurrentClip: Clip? = null
+    private var camPendingShare: Clip? = null
     private var clipPlayer: ExoPlayer? = null
     private lateinit var pages: List<View>
     private lateinit var dots: List<View>
@@ -267,6 +273,7 @@ class MainActivity : Activity(), DashCam.Listener {
         findViewById<View>(R.id.camTabNormal).setOnClickListener { showClipTab(0) }
         findViewById<View>(R.id.camTabEvent).setOnClickListener { showClipTab(1) }
         findViewById<View>(R.id.camPlayerBack).setOnClickListener { stopClipPlayer(); camShow(CAM_CLIPS) }
+        findViewById<View>(R.id.camShare).setOnClickListener { camCurrentClip?.let { shareClip(it) } }
         val clipList = findViewById<ListView>(R.id.camList)
         clipList.adapter = clipAdapter
         clipList.setOnItemClickListener { _, _, position, _ ->
@@ -581,6 +588,16 @@ class MainActivity : Activity(), DashCam.Listener {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 3) {
+            val clip = camPendingShare
+            camPendingShare = null
+            if (clip != null && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                shareClip(clip)
+            } else if (clip != null) {
+                Toast.makeText(this, R.string.cam_save_failed, Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         startGps()
     }
 
@@ -1463,6 +1480,7 @@ class MainActivity : Activity(), DashCam.Listener {
 
     private fun playClip(clip: Clip) {
         stopClipPlayer()
+        camCurrentClip = clip
         camShow(CAM_PLAYING)
         val player = ExoPlayer.Builder(this).build()
         clipPlayer = player
@@ -1481,6 +1499,80 @@ class MainActivity : Activity(), DashCam.Listener {
         } catch (ex: Exception) {
             // Already released
         }
+    }
+
+    /**
+     * Saves a clip to the unit's Movies, then hands it to the Android share sheet
+     * (WhatsApp, etc.). The download runs over the camera's Wi-Fi; once it is on
+     * the unit, the camera is closed so the hotspot's internet returns for sending.
+     */
+    private fun shareClip(clip: Clip) {
+        // Writing to shared storage needs this permission while Masar targets old Android.
+        if (checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            camPendingShare = clip
+            requestPermissions(arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE), 3)
+            return
+        }
+        val network = dashCam.network
+        val save = findViewById<TextView>(R.id.camSave)
+        save.text = getString(R.string.cam_saving, 0)
+        save.visibility = View.VISIBLE
+        Thread {
+            val resolver = contentResolver
+            val stamp = clip.time.replace(Regex("[^0-9]"), "").ifEmpty { System.currentTimeMillis().toString() }
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, "Masar-$stamp.mp4")
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Masar")
+                put(MediaStore.Video.Media.IS_PENDING, 1)
+            }
+            var uri: Uri? = null
+            var ok = false
+            try {
+                uri = resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values)
+                if (uri != null) {
+                    resolver.openOutputStream(uri)?.use { out ->
+                        ok = DashcamClips.download(network, clip, out) { pct ->
+                            runOnUiThread { if (save.visibility == View.VISIBLE) save.text = getString(R.string.cam_saving, pct) }
+                        }
+                    }
+                }
+            } catch (ex: Exception) {
+                ok = false
+            }
+            val saved = uri
+            if (ok && saved != null) {
+                values.clear()
+                values.put(MediaStore.Video.Media.IS_PENDING, 0)
+                try {
+                    resolver.update(saved, values, null, null)
+                } catch (ex: Exception) {
+                    // Leave as pending; the share still works this session
+                }
+            } else if (saved != null) {
+                try {
+                    resolver.delete(saved, null, null)
+                } catch (ex: Exception) {
+                    // Nothing to clean up
+                }
+            }
+            runOnUiThread {
+                save.visibility = View.GONE
+                if (ok && saved != null) {
+                    // Leave the camera's Wi-Fi so the share app has internet.
+                    stopClipPlayer()
+                    dashCam.close()
+                    camShow(CAM_LIVE)
+                    val send = Intent(Intent.ACTION_SEND)
+                        .setType("video/mp4")
+                        .putExtra(Intent.EXTRA_STREAM, saved)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    open(Intent.createChooser(send, getString(R.string.cam_share)), getString(R.string.cam_share))
+                } else {
+                    Toast.makeText(this, R.string.cam_save_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 
     /** The camera's Wi-Fi name (or how it starts) and its password. Kept only on this unit. */
@@ -1786,6 +1878,8 @@ class MainActivity : Activity(), DashCam.Listener {
         px(findViewById(R.id.camTabEvent), 3.6f)
         px(findViewById(R.id.camListEmpty), 3.6f)
         px(findViewById(R.id.camPlayerBack), 3.4f)
+        px(findViewById(R.id.camShare), 3.4f)
+        px(findViewById(R.id.camSave), 4.2f)
         px(camButton, 3.8f)
         px(findViewById(R.id.camFrontLabel), 3.2f)
         px(findViewById(R.id.camRearLabel), 3.2f)
