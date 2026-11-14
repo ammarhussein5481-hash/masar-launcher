@@ -1344,13 +1344,15 @@ class MainActivity : Activity(), DashCam.Listener {
         Thread {
             // Live playback may have only just stopped; let the camera settle.
             sleepMs(1200)
-            val normal = fetchOne(network, "Normal")
+            val errors = ArrayList<String>()
+            val normal = fetchOne(network, "Normal", errors)
             sleepMs(3000)
-            val event = fetchOne(network, "Event")
+            val event = fetchOne(network, "Event", errors)
             // If nothing came back, ask the camera one plain question for a reason to show.
             val diag = if (normal == null && event == null) {
                 sleepMs(1500)
-                "net=" + (if (network == null) "none" else "ok") + " · " + DashcamClips.probe(network, "Normal")
+                "net=" + (if (network == null) "none" else "ok") + " · " + DashcamClips.probe(network, "Normal") +
+                    "\nlist: " + errors.distinct().joinToString(" | ")
             } else {
                 ""
             }
@@ -1365,16 +1367,32 @@ class MainActivity : Activity(), DashCam.Listener {
         }.start()
     }
 
-    /** One property, tried twice, because the camera sometimes drops the first request. */
-    private fun fetchOne(network: android.net.Network?, property: String): List<Clip>? {
-        for (attempt in 0 until 2) {
-            try {
-                return DashcamClips.list(network, property)
-            } catch (ex: Exception) {
-                sleepMs(2500)
+    /**
+     * One property, newest first, in small pages (the camera fails large requests) with the
+     * ~3 s gap it needs between requests. Each page is tried twice, because the camera
+     * sometimes drops a request. Returns null only if the first page never came back.
+     */
+    private fun fetchOne(network: android.net.Network?, property: String, errors: MutableList<String>): List<Clip>? {
+        val all = ArrayList<Clip>()
+        for (page in 0 until CLIP_PAGES) {
+            if (page > 0) sleepMs(3000)
+            var got: List<Clip>? = null
+            for (attempt in 0 until 2) {
+                try {
+                    got = DashcamClips.list(network, property, DashcamClips.PAGE, page * DashcamClips.PAGE)
+                    break
+                } catch (ex: Exception) {
+                    errors.add(property + ": " + ex.javaClass.simpleName + " " + (ex.message ?: ""))
+                    sleepMs(3000)
+                }
             }
+            if (got == null) return if (page == 0) null else all
+            // If the camera ignores "from" it repeats the first page; stop on nothing new.
+            val fresh = got.filter { c -> all.none { it.name == c.name } }
+            all.addAll(fresh)
+            if (got.size < DashcamClips.PAGE || fresh.isEmpty()) break
         }
-        return null
+        return all
     }
 
     private fun sleepMs(ms: Long) {
@@ -2415,6 +2433,8 @@ class MainActivity : Activity(), DashCam.Listener {
         private const val CAM_LIVE = 0
         private const val CAM_CLIPS = 1
         private const val CAM_PLAYING = 2
+        /** Clip-list pages per property (10 clips each): up to the 30 newest clips. */
+        private const val CLIP_PAGES = 3
         /** True once CarPlay has been opened automatically in this run of the unit. */
         private var autoOpened = false
         private const val WALLPAPER_FILE = "wallpaper.jpg"

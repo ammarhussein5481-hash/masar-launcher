@@ -24,6 +24,8 @@ class Clip(val name: String, val sizeBytes: Long, val time: String, val event: B
 object DashcamClips {
 
     const val USER_AGENT = "Masar launcher"
+    /** The camera answered 3 and 5 per request in tests but failed a request for 50, so ask in small pages. */
+    const val PAGE = 10
     private const val BASE = "http://192.168.1.1"
 
     /**
@@ -32,8 +34,8 @@ object DashcamClips {
      * default network is the phone hotspot, which can't reach the camera. Blocks.
      */
     @Throws(IOException::class)
-    fun list(network: Network?, property: String, count: Int = 50): List<Clip> {
-        val url = URL("$BASE/cgi-bin/Config.cgi?action=dir&property=$property&format=all&count=$count&from=0")
+    fun list(network: Network?, property: String, count: Int = PAGE, from: Int = 0): List<Clip> {
+        val url = URL("$BASE/cgi-bin/Config.cgi?action=dir&property=$property&format=all&count=$count&from=$from")
         val conn = (network?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
