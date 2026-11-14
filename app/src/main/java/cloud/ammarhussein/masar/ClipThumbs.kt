@@ -13,9 +13,9 @@ import java.util.concurrent.Executors
 /**
  * A thumbnail for each dash cam clip.
  *
- * Two ways to get one, tried in order: the camera's own thumbnail file if it
- * serves one (cheap), otherwise the clip's first frame pulled over the camera's
- * Wi-Fi (works on any clip, heavier). Results are cached for the session, and a
+ * Two ways to get one, tried in order: the camera's own thumbnail (/thumb/<clip
+ * path>, cheap), otherwise, for front clips only, the clip's first frame pulled
+ * over the camera's Wi-Fi (heavier). Results are cached for the session, and a
  * clip that yields nothing is remembered so it isn't tried again.
  *
  * Work runs on one background thread with a small gap between clips, because the
@@ -69,21 +69,10 @@ object ClipThumbs {
     }
 
     private fun load(clip: Clip, network: Network?, w: Int, h: Int): Bitmap? {
-        for (url in thumbUrls(clip.name)) {
-            fetchImage(network, url)?.let { return it }
-        }
-        return firstFrame(clip.url, w, h)
-    }
-
-    /** Guesses for a thumbnail the camera may already hold next to the clip. */
-    private fun thumbUrls(name: String): List<String> {
-        val base = "http://192.168.1.1"
-        val noExt = name.removeSuffix(".mp4")
-        return listOf(
-            "$base$noExt.jpg",
-            "$base/thumb$name",
-            "$base$name.jpg"
-        )
+        // The camera serves /thumb/<clip path> for front clips; <clip>.jpg is always a 404, so it isn't asked for.
+        fetchImage(network, "http://192.168.1.1/thumb${clip.name}")?.let { return it }
+        // Rear clips are twice the size of front ones; don't pull frames from them, the placeholder will do.
+        return if (clip.rear) null else firstFrame(clip.url, w, h)
     }
 
     private fun fetchImage(network: Network?, url: String): Bitmap? {

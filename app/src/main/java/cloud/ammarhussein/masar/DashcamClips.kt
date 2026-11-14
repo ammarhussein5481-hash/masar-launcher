@@ -9,8 +9,8 @@ import java.net.URL
 class Clip(val name: String, val sizeBytes: Long, val time: String, val event: Boolean) {
     /** Plain HTTP, seekable, no signature. Plays straight into a player. */
     val url: String get() = "http://192.168.1.1$name"
-    /** Rear clips are marked only in the path and name on this camera. */
-    val rear: Boolean get() = name.contains(".s_Rear") || name.endsWith("R.mp4")
+    /** Rear clips are marked only in the path and name: /mnt/mmc/Normal/Back/NO…B.mp4 on the A800S. */
+    val rear: Boolean get() = name.contains("/Back/") || name.contains(".s_Rear") || name.endsWith("B.mp4") || name.endsWith("R.mp4")
 }
 
 /**
@@ -29,13 +29,20 @@ object DashcamClips {
     private const val BASE = "http://192.168.1.1"
 
     /**
-     * The clips for one property (Normal, Event, NormalRear, Rear), newest first.
+     * The camera's own name for a directory listing. Front clips are action=dir; rear clips are
+     * action=reardir with the same properties and the same XML. (property=NormalRear/Rear always
+     * report amount=0, and bydir/byreardir need the vendor app's signature, so neither is used.)
+     */
+    private fun action(rear: Boolean) = if (rear) "reardir" else "dir"
+
+    /**
+     * The clips for one property (Normal, Event) of the front or [rear] camera, newest first.
      * The request goes out [network] (the camera's Wi-Fi), because the unit's
      * default network is the phone hotspot, which can't reach the camera. Blocks.
      */
     @Throws(IOException::class)
-    fun list(network: Network?, property: String, count: Int = PAGE, from: Int = 0): List<Clip> {
-        val url = URL("$BASE/cgi-bin/Config.cgi?action=dir&property=$property&format=all&count=$count&from=$from")
+    fun list(network: Network?, property: String, rear: Boolean = false, count: Int = PAGE, from: Int = 0): List<Clip> {
+        val url = URL("$BASE/cgi-bin/Config.cgi?action=${action(rear)}&property=$property&format=all&count=$count&from=$from")
         val conn = (network?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
@@ -60,8 +67,8 @@ object DashcamClips {
     }
 
     /** A short description of what the camera does for one dir request, for on-screen diagnosis. */
-    fun probe(network: Network?, property: String): String {
-        val url = URL("$BASE/cgi-bin/Config.cgi?action=dir&property=$property&format=all&count=3&from=0")
+    fun probe(network: Network?, property: String, rear: Boolean = false): String {
+        val url = URL("$BASE/cgi-bin/Config.cgi?action=${action(rear)}&property=$property&format=all&count=3&from=0")
         return try {
             val conn = (network?.openConnection(url) ?: url.openConnection()) as HttpURLConnection
             conn.connectTimeout = 8000

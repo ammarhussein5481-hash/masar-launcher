@@ -116,10 +116,21 @@ class MainActivity : Activity(), DashCam.Listener {
     private var camMode = CAM_LIVE
     /** Set when the camera is being opened to go straight to the clip list. */
     private var camWantClips = false
-    private var camClipsLoaded = false
+    /** Which camera's recordings the list shows: 0 front, 1 rear. Remembered between runs. */
+    private var camSide = 0
     private var camTab = 0
-    private var camDiag = ""
-    private val camClips = arrayOf<List<Clip>>(emptyList(), emptyList())
+    /** Per side ([camSide]): whether its lists came back, the reason shown if not, and the lists per tab. */
+    private val camLoaded = BooleanArray(2)
+    private val camDiags = arrayOf("", "")
+    private val camSideClips = Array(2) { arrayOf<List<Clip>>(emptyList(), emptyList()) }
+    /** The lists (Driving, Events) for the side on screen. */
+    private val camClips: Array<List<Clip>> get() = camSideClips[camSide]
+    /** Bumped to make a list fetch still running drop its results; [camFetchSide] is the side being fetched, or -1. */
+    @Volatile private var camFetchGen = 0
+    private var camFetchSide = -1
+    /** When the last request went to the camera, for spacing them (it drops requests that come too fast). */
+    private val camPaceLock = Object()
+    private var camLastRequestAt = 0L
     private var camCurrentClip: Clip? = null
     private var camPendingShare: Clip? = null
     private var clipPlayer: ExoPlayer? = null
@@ -272,6 +283,9 @@ class MainActivity : Activity(), DashCam.Listener {
         findViewById<View>(R.id.camClips).setOnClickListener { toggleClips() }
         findViewById<View>(R.id.camTabNormal).setOnClickListener { showClipTab(0) }
         findViewById<View>(R.id.camTabEvent).setOnClickListener { showClipTab(1) }
+        camSide = prefs.getInt(PREF_CAM_SIDE, 0).coerceIn(0, 1)
+        findViewById<View>(R.id.camSideFront).setOnClickListener { showClipSide(0) }
+        findViewById<View>(R.id.camSideRear).setOnClickListener { showClipSide(1) }
         findViewById<View>(R.id.camPlayerBack).setOnClickListener { stopClipPlayer(); camShow(CAM_CLIPS) }
         findViewById<View>(R.id.camShare).setOnClickListener { camCurrentClip?.let { shareClip(it) } }
         val clipList = findViewById<ListView>(R.id.camList)
@@ -1338,14 +1352,14 @@ class MainActivity : Activity(), DashCam.Listener {
         if (!dashCam.isOpen) {
             // Open the camera straight into the clip list, without the live streams.
             camWantClips = true
-            camClipsLoaded = false
+            resetClips()
             openCamera(live = false)
             return
         }
         if (camMode == CAM_LIVE) {
             dashCam.stopLive()
             camShow(CAM_CLIPS)
-            if (!camClipsLoaded) fetchClips()
+            ensureClips()
         } else {
             stopClipPlayer()
             camShow(CAM_LIVE)
@@ -1353,60 +1367,121 @@ class MainActivity : Activity(), DashCam.Listener {
         }
     }
 
-    /** Reads both clip lists off the main thread, over the camera network, with the gap it needs. */
-    private fun fetchClips() {
-        findViewById<TextView>(R.id.camListEmpty).setText(R.string.cam_list_loading)
-        findViewById<View>(R.id.camListEmpty).visibility = View.VISIBLE
+    /** Forgets every list, and makes any fetch still running drop what it gets. */
+    private fun resetClips() {
+        camFetchGen++
+        camFetchSide = -1
+        for (side in 0..1) {
+            camLoaded[side] = false
+            camDiags[side] = ""
+            camSideClips[side][0] = emptyList()
+            camSideClips[side][1] = emptyList()
+        }
+    }
+
+    /** Fetches the side on screen unless it is already loaded or on its way. */
+    private fun ensureClips() {
+        if (!camLoaded[camSide] && camFetchSide != camSide) fetchClips(camSide)
+    }
+
+    /** The Front / Rear switch above the list. */
+    private fun showClipSide(side: Int) {
+        if (side != camSide) {
+            camSide = side
+            prefs.edit().putInt(PREF_CAM_SIDE, side).apply()
+        }
+        showClipTab(camTab)
+        if (camMode == CAM_CLIPS) ensureClips()
+    }
+
+    /**
+     * Reads one side's lists (Driving, then Events) off the main thread, over the camera
+     * network, with the gap it needs. Each page is shown as soon as it arrives. Starting a
+     * fetch stops any other one still running, so the side asked for goes first.
+     */
+    private fun fetchClips(side: Int) {
+        val gen = ++camFetchGen
+        camFetchSide = side
+        showClipTab(camTab)
         val network = dashCam.network
+        val rear = side == 1
         Thread {
             // Live playback may have only just stopped; let the camera settle.
             sleepMs(1200)
             val errors = ArrayList<String>()
-            val normal = fetchOne(network, "Normal", errors)
-            sleepMs(3000)
-            val event = fetchOne(network, "Event", errors)
+            val normal = fetchOne(network, rear, "Normal", errors, gen) { postPage(gen, side, 0, it) }
+            // Locked clips; the rear camera may have none or not answer, which just leaves the tab empty.
+            val event = fetchOne(network, rear, "Event", errors, gen) { postPage(gen, side, 1, it) }
             // If nothing came back, ask the camera one plain question for a reason to show.
-            val diag = if (normal == null && event == null) {
-                sleepMs(1500)
-                "net=" + (if (network == null) "none" else "ok") + " · " + DashcamClips.probe(network, "Normal") +
+            val diag = if (normal == null && event == null && gen == camFetchGen) {
+                paceCamera()
+                "net=" + (if (network == null) "none" else "ok") + " · " + DashcamClips.probe(network, "Normal", rear) +
                     "\nlist: " + errors.distinct().joinToString(" | ")
             } else {
                 ""
             }
             runOnUiThread {
-                if (camMode == CAM_LIVE) return@runOnUiThread
-                camClips[0] = normal ?: emptyList()
-                camClips[1] = event ?: emptyList()
-                camClipsLoaded = normal != null || event != null
-                camDiag = diag
-                showClipTab(camTab)
+                if (gen != camFetchGen) return@runOnUiThread
+                camFetchSide = -1
+                camSideClips[side][0] = normal ?: emptyList()
+                camSideClips[side][1] = event ?: emptyList()
+                camLoaded[side] = normal != null || event != null
+                camDiags[side] = diag
+                if (camMode != CAM_LIVE) showClipTab(camTab)
             }
         }.start()
     }
 
+    /** One page has come in for [side]'s [tab]: show what there is so far. */
+    private fun postPage(gen: Int, side: Int, tab: Int, soFar: List<Clip>) {
+        runOnUiThread {
+            if (gen != camFetchGen) return@runOnUiThread
+            camSideClips[side][tab] = soFar
+            if (side == camSide && tab == camTab && camMode != CAM_LIVE) showClipTab(camTab)
+        }
+    }
+
+    /** Waits until the camera has had its ~3 s since the last request, whichever list sent it. */
+    private fun paceCamera() {
+        synchronized(camPaceLock) {
+            val wait = camLastRequestAt + CAM_GAP_MS - SystemClock.elapsedRealtime()
+            if (wait > 0) sleepMs(wait)
+            camLastRequestAt = SystemClock.elapsedRealtime()
+        }
+    }
+
     /**
-     * One property, newest first, in small pages (the camera fails large requests) with the
-     * ~3 s gap it needs between requests. Each page is tried twice, because the camera
-     * sometimes drops a request. Returns null only if the first page never came back.
+     * One property of the front or [rear] camera, newest first, in small pages (the camera
+     * fails large requests), spaced by [paceCamera]. Each page is tried twice, because the
+     * camera sometimes drops a request, and handed to [onPage] as it lands. Returns null if
+     * the first page never came back, or if a newer fetch ([gen]) has taken over.
      */
-    private fun fetchOne(network: android.net.Network?, property: String, errors: MutableList<String>): List<Clip>? {
+    private fun fetchOne(
+        network: android.net.Network?,
+        rear: Boolean,
+        property: String,
+        errors: MutableList<String>,
+        gen: Int,
+        onPage: (List<Clip>) -> Unit
+    ): List<Clip>? {
         val all = ArrayList<Clip>()
         for (page in 0 until CLIP_PAGES) {
-            if (page > 0) sleepMs(3000)
             var got: List<Clip>? = null
             for (attempt in 0 until 2) {
+                if (gen != camFetchGen) return null
+                paceCamera()
                 try {
-                    got = DashcamClips.list(network, property, DashcamClips.PAGE, page * DashcamClips.PAGE)
+                    got = DashcamClips.list(network, property, rear, DashcamClips.PAGE, page * DashcamClips.PAGE)
                     break
                 } catch (ex: Exception) {
-                    errors.add(property + ": " + ex.javaClass.simpleName + " " + (ex.message ?: ""))
-                    sleepMs(3000)
+                    errors.add((if (rear) "rear " else "") + property + ": " + ex.javaClass.simpleName + " " + (ex.message ?: ""))
                 }
             }
             if (got == null) return if (page == 0) null else all
             // If the camera ignores "from" it repeats the first page; stop on nothing new.
             val fresh = got.filter { c -> all.none { it.name == c.name } }
             all.addAll(fresh)
+            if (fresh.isNotEmpty()) onPage(ArrayList(all))
             if (got.size < DashcamClips.PAGE || fresh.isEmpty()) break
         }
         return all
@@ -1422,14 +1497,17 @@ class MainActivity : Activity(), DashCam.Listener {
 
     private fun showClipTab(tab: Int) {
         camTab = tab
+        findViewById<TextView>(R.id.camSideFront).setTextColor(getColor(if (camSide == 0) R.color.text else R.color.text_dim))
+        findViewById<TextView>(R.id.camSideRear).setTextColor(getColor(if (camSide == 1) R.color.text else R.color.text_dim))
         findViewById<TextView>(R.id.camTabNormal).setTextColor(getColor(if (tab == 0) R.color.text else R.color.text_dim))
         findViewById<TextView>(R.id.camTabEvent).setTextColor(getColor(if (tab == 1) R.color.text else R.color.text_dim))
         clipAdapter.notifyDataSetChanged()
         val empty = findViewById<TextView>(R.id.camListEmpty)
         if (camClips[tab].isEmpty()) {
             empty.text = when {
-                camClipsLoaded -> getString(R.string.cam_list_empty)
-                camDiag.isNotEmpty() -> getString(R.string.cam_list_fail) + "\n\n" + camDiag
+                camFetchSide == camSide -> getString(R.string.cam_list_loading)
+                camLoaded[camSide] -> getString(R.string.cam_list_empty)
+                camDiags[camSide].isNotEmpty() -> getString(R.string.cam_list_fail) + "\n\n" + camDiags[camSide]
                 else -> getString(R.string.cam_list_fail)
             }
             empty.visibility = View.VISIBLE
@@ -1625,16 +1703,14 @@ class MainActivity : Activity(), DashCam.Listener {
         if (!open) {
             camPlaying[0] = false
             camPlaying[1] = false
-            camClipsLoaded = false
-            camClips[0] = emptyList()
-            camClips[1] = emptyList()
+            resetClips()
             stopClipPlayer()
             camShow(CAM_LIVE)
         } else if (state == DashCam.JOINED && camWantClips) {
             // Opened straight into the clip list.
             camWantClips = false
             camShow(CAM_CLIPS)
-            if (!camClipsLoaded) fetchClips()
+            ensureClips()
         }
         // A picture that is not playing is hidden, so no frozen last frame is left on screen.
         findViewById<View>(R.id.camFront).alpha = if (camPlaying[0]) 1f else 0f
@@ -1876,6 +1952,8 @@ class MainActivity : Activity(), DashCam.Listener {
         px(findViewById(R.id.camClips), 3.6f)
         px(findViewById(R.id.camTabNormal), 3.6f)
         px(findViewById(R.id.camTabEvent), 3.6f)
+        px(findViewById(R.id.camSideFront), 3.6f)
+        px(findViewById(R.id.camSideRear), 3.6f)
         px(findViewById(R.id.camListEmpty), 3.6f)
         px(findViewById(R.id.camPlayerBack), 3.4f)
         px(findViewById(R.id.camShare), 3.4f)
@@ -2529,6 +2607,9 @@ class MainActivity : Activity(), DashCam.Listener {
         private const val CAM_PLAYING = 2
         /** Clip-list pages per property (10 clips each): up to the 30 newest clips. */
         private const val CLIP_PAGES = 3
+        /** The gap the camera needs between requests; it drops ones that come faster. */
+        private const val CAM_GAP_MS = 3000L
+        private const val PREF_CAM_SIDE = "cam_side"
         /** True once CarPlay has been opened automatically in this run of the unit. */
         private var autoOpened = false
         private const val WALLPAPER_FILE = "wallpaper.jpg"

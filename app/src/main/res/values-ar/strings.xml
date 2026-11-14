@@ -208,6 +208,8 @@
     <string name="cam_live_btn">مباشر</string>
     <string name="cam_tab_normal">القيادة</string>
     <string name="cam_tab_event">الأحداث</string>
+    <string name="cam_side_front">الكاميرا الأمامية</string>
+    <string name="cam_side_rear">الكاميرا الخلفية</string>
     <string name="cam_list_loading">جارٍ قراءة المقاطع…</string>
     <string name="cam_list_empty">لا توجد مقاطع هنا</string>
     <string name="cam_list_fail">تعذّرت قراءة المقاطع. هل الكاميرا متصلة؟</string>
