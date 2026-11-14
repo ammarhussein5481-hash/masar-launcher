@@ -215,8 +215,8 @@
     <string name="cam_live_btn">Live</string>
     <string name="cam_tab_normal">Driving</string>
     <string name="cam_tab_event">Events</string>
-    <string name="cam_side_front">Front camera</string>
-    <string name="cam_side_rear">Rear camera</string>
+    <string name="cam_side_front">Front video</string>
+    <string name="cam_side_rear">Rear video</string>
     <string name="cam_list_loading">Reading the clips…</string>
     <string name="cam_list_empty">No clips here</string>
     <string name="cam_list_fail">Couldn\'t read the clips. Is the camera connected?</string>
