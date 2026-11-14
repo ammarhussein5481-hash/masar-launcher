@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 9+ blocks plain http:// by default. The 70mai dash cam only speaks HTTP on its
+     own Wi-Fi (clip list, thumbnails, clip playback), so allow cleartext to the camera only. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.1.1</domain>
+    </domain-config>
+</network-security-config>
