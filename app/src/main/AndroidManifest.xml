@@ -87,6 +87,12 @@
             </intent-filter>
         </service>
 
+        <!-- Internet radio playback, kept alive while other apps are in front -->
+        <service
+            android:name=".RadioService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
         <!-- Only so the home bar can press Back and Recents; asks for no events. -->
         <service
             android:name=".KeysService"

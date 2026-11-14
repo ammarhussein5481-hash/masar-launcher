@@ -225,4 +225,17 @@
     <string name="cam_share">Share</string>
     <string name="cam_saving">Saving… %1$d%%</string>
     <string name="cam_save_failed">Couldn\'t save the clip</string>
+    <string name="radio_fm">FM</string>
+    <string name="radio_favs">★</string>
+    <string name="radio_search_hint">Search stations</string>
+    <string name="radio_loading">Loading stations…</string>
+    <string name="radio_empty">No stations found</string>
+    <string name="radio_offline">Radio needs internet. Leave the camera first if it is open.</string>
+    <string name="radio_favs_empty">No favourites yet. Tap ☆ on a station to save it.</string>
+    <string name="radio_station_info">%1$s · %2$d kbps</string>
+    <string name="radio_stop">Stop</string>
+    <string name="radio_title">Masar radio</string>
+    <string name="radio_playing">Playing</string>
+    <string name="radio_channel">Radio</string>
+    <string name="radio_pick_fm">Choose your FM radio app</string>
 </resources>

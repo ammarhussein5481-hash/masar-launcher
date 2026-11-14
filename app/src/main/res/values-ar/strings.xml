@@ -218,4 +218,17 @@
     <string name="cam_share">مشاركة</string>
     <string name="cam_saving">جارٍ الحفظ… %1$d%%</string>
     <string name="cam_save_failed">تعذّر حفظ المقطع</string>
+    <string name="radio_fm">FM</string>
+    <string name="radio_favs">★</string>
+    <string name="radio_search_hint">ابحث عن محطة</string>
+    <string name="radio_loading">جارٍ تحميل المحطات…</string>
+    <string name="radio_empty">لا توجد محطات</string>
+    <string name="radio_offline">الراديو يحتاج إنترنت. أغلق الكاميرا أولاً إن كانت مفتوحة.</string>
+    <string name="radio_favs_empty">لا توجد مفضلات بعد. المس ☆ على محطة لحفظها.</string>
+    <string name="radio_station_info">%1$s · %2$d ك/ث</string>
+    <string name="radio_stop">إيقاف</string>
+    <string name="radio_title">راديو مسار</string>
+    <string name="radio_playing">يُشغَّل الآن</string>
+    <string name="radio_channel">الراديو</string>
+    <string name="radio_pick_fm">اختر تطبيق راديو FM</string>
 </resources>

@@ -54,6 +54,7 @@ import android.widget.Toast
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
+import org.json.JSONArray
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -134,6 +135,13 @@ class MainActivity : Activity(), DashCam.Listener {
     private var camCurrentClip: Clip? = null
     private var camPendingShare: Clip? = null
     private var clipPlayer: ExoPlayer? = null
+
+    private lateinit var radioList: ListView
+    private lateinit var radioNowBar: View
+    private lateinit var radioNow: TextView
+    private var radioStations: List<Station> = emptyList()
+    private var radioShowingFavs = false
+    private var radioLoaded = false
     private lateinit var pages: List<View>
     private lateinit var dots: List<View>
     private lateinit var carStatus: TextView
@@ -249,8 +257,31 @@ class MainActivity : Activity(), DashCam.Listener {
         page2 = findViewById(R.id.page2)
         page3 = findViewById(R.id.page3)
         page4 = findViewById(R.id.page4)
-        pages = listOf(home, page2, page3, page4)
-        dots = listOf<View>(findViewById(R.id.dot0), findViewById(R.id.dot1), findViewById(R.id.dot2), findViewById(R.id.dot3))
+        val page5 = findViewById<View>(R.id.page5)
+        pages = listOf(home, page2, page3, page4, page5)
+        dots = listOf<View>(
+            findViewById(R.id.dot0), findViewById(R.id.dot1), findViewById(R.id.dot2),
+            findViewById(R.id.dot3), findViewById(R.id.dot4)
+        )
+        radioList = findViewById(R.id.radioList)
+        radioNowBar = findViewById(R.id.radioNowBar)
+        radioNow = findViewById(R.id.radioNow)
+        radioList.adapter = stationAdapter
+        radioList.setOnItemClickListener { _, _, position, _ ->
+            radioStations.getOrNull(position)?.let { RadioService.play(this, it) }
+        }
+        findViewById<TextView>(R.id.radioStop).setOnClickListener { RadioService.stop(this) }
+        findViewById<TextView>(R.id.radioFavs).setOnClickListener {
+            radioShowingFavs = !radioShowingFavs
+            loadStations(findViewById<android.widget.EditText>(R.id.radioSearch).text.toString())
+        }
+        findViewById<TextView>(R.id.radioFm).setOnClickListener { openFmApp(false) }
+        findViewById<TextView>(R.id.radioFm).setOnLongClickListener { openFmApp(true); true }
+        findViewById<android.widget.EditText>(R.id.radioSearch).setOnEditorActionListener { v, _, _ ->
+            radioShowingFavs = false
+            loadStations(v.text.toString())
+            true
+        }
         camStatus = findViewById(R.id.camStatus)
         camButton = findViewById(R.id.camButton)
         dashCam = DashCam(this, this)
@@ -433,6 +464,8 @@ class MainActivity : Activity(), DashCam.Listener {
     override fun onStart() {
         super.onStart()
         HandleService.homeVisible = true
+        RadioService.onChange = { runOnUiThread { updateRadioBar() } }
+        updateRadioBar()
         startGps()
         if (!netRegistered) {
             try {
@@ -494,6 +527,7 @@ class MainActivity : Activity(), DashCam.Listener {
     override fun onStop() {
         super.onStop()
         HandleService.homeVisible = false
+        RadioService.onChange = null
         stopGps()
         stopMedia()
         stopClipPlayer()
@@ -593,6 +627,10 @@ class MainActivity : Activity(), DashCam.Listener {
         for (i in dots.indices) dots[i].backgroundTintList = ColorStateList.valueOf(if (i == index) accent else idle)
         if (index == 1) refreshWeather(false)
         if (index == 2) renderCar()
+        if (index == 4) {
+            updateRadioBar()
+            if (!radioLoaded) loadStations("")
+        }
         // Leaving the camera page gives the Wi-Fi back to the hotspot.
         if (index != 3 && from == 3) {
             stopClipPlayer()
@@ -1733,6 +1771,144 @@ class MainActivity : Activity(), DashCam.Listener {
         }
     }
 
+    // ---------------------------------------------------------------- radio
+
+    /** Loads stations: favourites (offline) if that is toggled, else a search or the Saudi top list. */
+    private fun loadStations(query: String) {
+        findViewById<TextView>(R.id.radioFavs).setTextColor(getColor(if (radioShowingFavs) R.color.accent else R.color.text))
+        if (radioShowingFavs) {
+            radioStations = favStations()
+            radioLoaded = true
+            showStations(if (radioStations.isEmpty()) getString(R.string.radio_favs_empty) else "")
+            return
+        }
+        val empty = findViewById<TextView>(R.id.radioEmpty)
+        radioStations = emptyList()
+        stationAdapter.notifyDataSetChanged()
+        empty.text = getString(R.string.radio_loading)
+        empty.visibility = View.VISIBLE
+        Thread {
+            val list = try {
+                if (query.isBlank()) Radio.top() else Radio.search(query.trim())
+            } catch (ex: Exception) {
+                null
+            }
+            runOnUiThread {
+                radioLoaded = true
+                radioStations = list ?: emptyList()
+                stationAdapter.notifyDataSetChanged()
+                showStations(
+                    when {
+                        list == null -> getString(R.string.radio_offline)
+                        list.isEmpty() -> getString(R.string.radio_empty)
+                        else -> ""
+                    }
+                )
+            }
+        }.start()
+    }
+
+    private fun showStations(message: String) {
+        stationAdapter.notifyDataSetChanged()
+        val empty = findViewById<TextView>(R.id.radioEmpty)
+        if (radioStations.isEmpty() && message.isNotEmpty()) {
+            empty.text = message
+            empty.visibility = View.VISIBLE
+        } else {
+            empty.visibility = View.GONE
+        }
+    }
+
+    private fun updateRadioBar() {
+        if (RadioService.isOn) {
+            radioNow.text = RadioService.nowPlaying
+            radioNowBar.visibility = View.VISIBLE
+        } else {
+            radioNowBar.visibility = View.GONE
+        }
+        stationAdapter.notifyDataSetChanged()
+    }
+
+    private val stationAdapter = object : BaseAdapter() {
+        override fun getCount(): Int = radioStations.size
+        override fun getItem(position: Int): Any = radioStations[position]
+        override fun getItemId(position: Int): Long = position.toLong()
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = convertView ?: layoutInflater.inflate(R.layout.item_station, parent, false)
+            val station = radioStations[position]
+            val name = view.findViewById<TextView>(R.id.stationName)
+            name.text = station.name
+            px(name, 3.9f)
+            // The one playing is marked in the accent colour.
+            name.setTextColor(getColor(if (RadioService.isOn && RadioService.nowPlaying == station.name) R.color.accent else R.color.text))
+            val info = view.findViewById<TextView>(R.id.stationInfo)
+            info.text = getString(R.string.radio_station_info, station.codec.uppercase(Locale.US).ifEmpty { "—" }, station.bitrate)
+            px(info, 3.2f)
+            val star = view.findViewById<TextView>(R.id.stationStar)
+            star.text = if (isFav(station)) "★" else "☆"
+            px(star, 5f)
+            star.setOnClickListener {
+                toggleFav(station)
+                if (radioShowingFavs) loadStations("") else stationAdapter.notifyDataSetChanged()
+            }
+            return view
+        }
+    }
+
+    // Favourites, saved on the unit as a list of station records.
+    private fun favStations(): List<Station> {
+        val out = ArrayList<Station>()
+        try {
+            val array = JSONArray(prefs.getString("radio_favs", "[]"))
+            for (i in 0 until array.length()) Station.fromJson(array.getString(i))?.let { out.add(it) }
+        } catch (ex: Exception) {
+            // A damaged list reads as empty
+        }
+        return out
+    }
+
+    private fun isFav(station: Station): Boolean = favStations().any { it.url == station.url }
+
+    private fun toggleFav(station: Station) {
+        val list = favStations().toMutableList()
+        val at = list.indexOfFirst { it.url == station.url }
+        if (at >= 0) list.removeAt(at) else list.add(0, station)
+        val array = JSONArray()
+        for (s in list) array.put(s.toJson())
+        prefs.edit().putString("radio_favs", array.toString()).apply()
+    }
+
+    /** Opens the car's own radio app. Asks which app the first time, or on a long-press. */
+    private fun openFmApp(reassign: Boolean) {
+        val saved = prefs.getString("radio_app", "") ?: ""
+        if (reassign || saved.isEmpty()) {
+            pickFmApp()
+            return
+        }
+        val launch = packageManager.getLaunchIntentForPackage(saved)
+        if (launch == null) {
+            pickFmApp()
+        } else {
+            open(launch, getString(R.string.radio_fm))
+        }
+    }
+
+    private fun pickFmApp() {
+        if (!appsLoaded) {
+            Toast.makeText(this, R.string.radio_loading, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val choices = apps
+        val labels = choices.map { it.label }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.radio_pick_fm)
+            .setItems(labels) { _, which ->
+                prefs.edit().putString("radio_app", choices[which].component.packageName).apply()
+                openFmApp(false)
+            }
+            .show()
+    }
+
     // ---------------------------------------------------------------- settings
 
     /** A list to pick one of; [current] is ticked. */
@@ -1958,6 +2134,12 @@ class MainActivity : Activity(), DashCam.Listener {
         px(findViewById(R.id.camPlayerBack), 3.4f)
         px(findViewById(R.id.camShare), 3.4f)
         px(findViewById(R.id.camSave), 4.2f)
+        px(findViewById(R.id.radioSearch), 3.8f)
+        px(findViewById(R.id.radioFavs), 4.4f)
+        px(findViewById(R.id.radioFm), 3.8f)
+        px(findViewById(R.id.radioEmpty), 3.6f)
+        px(radioNow, 3.9f)
+        px(findViewById(R.id.radioStop), 3.6f)
         px(camButton, 3.8f)
         px(findViewById(R.id.camFrontLabel), 3.2f)
         px(findViewById(R.id.camRearLabel), 3.2f)

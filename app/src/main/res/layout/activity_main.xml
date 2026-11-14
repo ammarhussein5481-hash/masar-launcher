@@ -321,6 +321,8 @@
 
     <include layout="@layout/page_cam" />
 
+    <include layout="@layout/page_radio" />
+
     <!-- Which page is showing. Swipe sideways, or tap here, to change it. -->
     <LinearLayout
         android:id="@+id/pager"
@@ -358,6 +360,13 @@
 
         <View
             android:id="@+id/dot3"
+            android:layout_marginEnd="8dp"
+            android:layout_width="8dp"
+            android:layout_height="8dp"
+            android:background="@drawable/dot" />
+
+        <View
+            android:id="@+id/dot4"
             android:layout_width="8dp"
             android:layout_height="8dp"
             android:background="@drawable/dot" />
