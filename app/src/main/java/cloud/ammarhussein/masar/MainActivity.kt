@@ -1829,6 +1829,11 @@ class MainActivity : Activity(), DashCam.Listener {
         stationAdapter.notifyDataSetChanged()
     }
 
+    /** Redraws the station list (or reloads favourites if that filter is on). */
+    private fun refreshStations() {
+        if (radioShowingFavs) loadStations("") else stationAdapter.notifyDataSetChanged()
+    }
+
     private val stationAdapter = object : BaseAdapter() {
         override fun getCount(): Int = radioStations.size
         override fun getItem(position: Int): Any = radioStations[position]
@@ -1849,7 +1854,7 @@ class MainActivity : Activity(), DashCam.Listener {
             px(star, 5f)
             star.setOnClickListener {
                 toggleFav(station)
-                if (radioShowingFavs) loadStations("") else stationAdapter.notifyDataSetChanged()
+                refreshStations()
             }
             return view
         }
