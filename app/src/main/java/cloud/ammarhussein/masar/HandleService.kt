@@ -610,7 +610,7 @@ class HandleService : Service() {
             val coolantAt = if (alertKey == "coolant") COOLANT_HOT - 3 else COOLANT_HOT
             val transAt = if (alertKey == "trans") TRANS_HOT - 3 else TRANS_HOT
             // Voltage only counts with the engine running, and only if it stays wrong.
-            if (volts != null && rpm != null && rpm > 400 && (volts < VOLTS_LOW || volts > VOLTS_HIGH)) voltsOff++ else voltsOff = 0
+            if (volts != null && Obd.voltsExact && rpm != null && rpm > 400 && (volts < VOLTS_LOW || volts > VOLTS_HIGH)) voltsOff++ else voltsOff = 0
 
             if (coolant != null && coolant >= coolantAt) {
                 text = getString(R.string.alert_coolant, coolant)

@@ -51,6 +51,8 @@ object Obd {
     @Volatile var fuel: Int? = null
         private set
     @Volatile var volts: Float? = null
+    /** True when [volts] is the engine computer's figure, false when it is the dongle's rough one. */
+    @Volatile var voltsExact = false
         private set
     /** Transmission fluid temperature, read with a GM-specific request. */
     @Volatile var trans: Int? = null
@@ -394,12 +396,16 @@ object Obd {
      * on cheap dongles it can read a volt or two off.
      */
     private fun voltage(link: BluetoothSocket): Float? {
-        if (supported[0x42]) {
-            val exact = value(link, 0x42)
-            val volts = if (exact != null && exact.size >= 2) (exact[0] * 256 + exact[1]) / 1000f else 0f
+        // Ask even if the supported list missed it (it is read once, sometimes mid-start).
+        val exact = value(link, 0x42)
+        if (exact != null && exact.size >= 2) {
+            val volts = (exact[0] * 256 + exact[1]) / 1000f
+            voltsExact = true
             // With the key off the computer reports zero: show nothing rather than "0.0 V".
             return if (volts in 6f..20f) volts else null
         }
+        if (supported[0x42]) return null
+        voltsExact = false
         return Regex("(\\d+\\.\\d+)").find(ask(link, "ATRV", 2000))?.value?.toFloatOrNull()
     }
 
