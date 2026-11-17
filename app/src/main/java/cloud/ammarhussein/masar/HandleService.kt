@@ -643,6 +643,17 @@ class HandleService : Service() {
                     }
                 }
             }
+            // A battery that needs replacing is announced once a day.
+            if (text == null && now >= codeUntil && Battery.verdict(Options.prefs(this)) == Battery.REPLACE) {
+                val prefs = Options.prefs(this)
+                val day = System.currentTimeMillis() / 86_400_000L
+                if (prefs.getLong(PREF_BATTERY_DAY, 0L) != day) {
+                    prefs.edit().putLong(PREF_BATTERY_DAY, day).apply()
+                    codeText = getString(R.string.alert_battery)
+                    codeUntil = now + CODE_SHOW_MS
+                    if (alertKey == "code") alertKey = ""
+                }
+            }
             if (text == null && now < codeUntil) {
                 text = codeText
                 key = "code"
@@ -756,6 +767,7 @@ class HandleService : Service() {
         private const val TYRE_LOW = 26
         private const val CODE_SHOW_MS = 30_000L
         private const val PREF_CODES_SEEN = "codes_seen"
+        private const val PREF_BATTERY_DAY = "battery_alert_day"
 
         /** Pill length and thickness, in percent of screen height. On 1200x720: 158 x 20 px. */
         private const val PILL_LONG = 22f

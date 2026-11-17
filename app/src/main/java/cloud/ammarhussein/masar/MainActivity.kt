@@ -1035,17 +1035,53 @@ class MainActivity : Activity(), DashCam.Listener {
                 text.append(getString(R.string.svc_left, names[i], String.format(Locale.US, "%,d", left)))
             }
         }
+        val battery = Battery.verdict(prefs)
+        if (battery != Battery.UNKNOWN) {
+            val line = StringBuilder(getString(when (battery) {
+                Battery.REPLACE -> R.string.bat_replace
+                Battery.WEAK -> R.string.bat_weak
+                else -> R.string.bat_good
+            }))
+            Battery.rest(prefs)?.let { line.append(" · ").append(getString(R.string.bat_rest, String.format(Locale.US, "%.1f", it))) }
+            Battery.crank(prefs)?.let { line.append(" · ").append(getString(R.string.bat_crank, String.format(Locale.US, "%.1f", it))) }
+            Battery.ageMonths(prefs)?.let { line.append(" · ").append(getString(R.string.bat_age, it)) }
+            if (text.isNotEmpty()) text.append('\n')
+            text.append(line)
+            if (battery == Battery.REPLACE) due = true
+        } else {
+            if (text.isNotEmpty()) text.append('\n')
+            text.append(getString(R.string.bat_unknown))
+        }
         if (carService.text.toString() != text.toString()) carService.text = text
         carService.setTextColor(getColor(if (due) R.color.bad else R.color.text))
     }
 
     private fun serviceDialog() {
         val names = resources.getStringArray(R.array.services)
-        val items = Array(names.size) { getString(R.string.svc_done, names[it]) }
+        val items = Array(names.size + 2) {
+            when (it) {
+                names.size -> getString(R.string.bat_new_today)
+                names.size + 1 -> getString(R.string.bat_set_date)
+                else -> getString(R.string.svc_done, names[it])
+            }
+        }
         AlertDialog.Builder(this)
             .setTitle(R.string.svc_pick)
             .setItems(items) { _, which ->
-                Options.serviceDone(prefs, which)
+                when (which) {
+                    names.size -> Battery.fitted(prefs, System.currentTimeMillis(), true)
+                    names.size + 1 -> {
+                        // An older battery: pick the day it was fitted, and keep what was measured.
+                        val day = Calendar.getInstance()
+                        android.app.DatePickerDialog(this, { _, y, m, d ->
+                            val picked = Calendar.getInstance()
+                            picked.set(y, m, d, 12, 0, 0)
+                            Battery.fitted(prefs, minOf(picked.timeInMillis, System.currentTimeMillis()), false)
+                            renderService()
+                        }, day.get(Calendar.YEAR), day.get(Calendar.MONTH), day.get(Calendar.DAY_OF_MONTH)).show()
+                    }
+                    else -> Options.serviceDone(prefs, which)
+                }
                 renderService()
             }
             .setNegativeButton(android.R.string.cancel, null)

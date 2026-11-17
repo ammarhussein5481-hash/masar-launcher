@@ -212,6 +212,7 @@ object Obd {
                 }
                 rpm = value(link, 0x0C)?.let { if (it.size >= 2) (it[0] * 256 + it[1]) / 4 else null }
                 speed = value(link, 0x0D)?.getOrNull(0)
+                val waiting = battery(context, link)
                 fuelFlow(link)
                 // The rest take turns, so the fuel count is sampled every two seconds.
                 when (turn++ % 4) {
@@ -220,7 +221,8 @@ object Obd {
                     2 -> if (transWorks) trans = transTemp(link)
                     3 -> if (turn % 40 == 3) extras(link)
                 }
-                pause(2000)
+                // Before a start the voltage is watched closely, to catch the starter's dip.
+                pause(if (waiting) 250 else 2000)
                 continue
             }
             if (wantClear) {
@@ -236,6 +238,7 @@ object Obd {
             // RPM and speed every round; the slow-moving values take turns.
             rpm = value(link, 0x0C)?.let { if (it.size >= 2) (it[0] * 256 + it[1]) / 4 else null }
             speed = value(link, 0x0D)?.getOrNull(0)
+            battery(context, link)
             fuelFlow(link)
             if (turn % 120 == 60) extras(link)
             when (turn++ % 6) {
@@ -548,6 +551,23 @@ object Obd {
             // Already closed
         }
         socket = null
+    }
+
+    /**
+     * With the engine not running, reads the voltage on every round and hands it to
+     * [Battery], which compares rest and starter voltage at the next start. Returns
+     * true while the engine is not running.
+     */
+    private fun battery(context: Context, link: BluetoothSocket): Boolean {
+        val turning = rpm
+        val waiting = turning == null || turning <= 400
+        var fresh: Float? = null
+        if (waiting) {
+            volts = voltage(link)
+            if (voltsExact) fresh = volts
+        }
+        Battery.sample(context, fresh, turning)
+        return waiting
     }
 
     private fun pause(ms: Long) {

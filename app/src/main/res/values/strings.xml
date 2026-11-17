@@ -177,6 +177,16 @@
     </string-array>
     <string name="svc_left">%1$s in %2$s km</string>
     <string name="svc_due">%1$s due</string>
+    <string name="bat_good">Battery good</string>
+    <string name="bat_weak">Battery weakening</string>
+    <string name="bat_replace">Replace battery soon</string>
+    <string name="bat_unknown">Battery: tap to set the date it was fitted</string>
+    <string name="bat_rest">rest %1$s V</string>
+    <string name="bat_crank">start %1$s V</string>
+    <string name="bat_age">%1$d mo</string>
+    <string name="bat_new_today">Battery: new one fitted today</string>
+    <string name="bat_set_date">Battery: set the date it was fitted</string>
+    <string name="alert_battery">Battery is weak · replace it soon</string>
     <string name="svc_pick">Which service was done?</string>
     <string name="svc_done">%1$s: done now</string>
     <string name="history_title">Past trips</string>

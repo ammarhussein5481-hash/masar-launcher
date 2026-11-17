@@ -171,6 +171,16 @@
     </string-array>
     <string name="svc_left">%1$s بعد %2$s كم</string>
     <string name="svc_due">%1$s مستحق</string>
+    <string name="bat_good">البطارية جيدة</string>
+    <string name="bat_weak">البطارية تضعف</string>
+    <string name="bat_replace">غيّر البطارية قريباً</string>
+    <string name="bat_unknown">البطارية: المس لتحديد تاريخ تركيبها</string>
+    <string name="bat_rest">ساكنة %1$s فولت</string>
+    <string name="bat_crank">عند التشغيل %1$s فولت</string>
+    <string name="bat_age">%1$d شهر</string>
+    <string name="bat_new_today">البطارية: رُكّبت جديدة اليوم</string>
+    <string name="bat_set_date">البطارية: تحديد تاريخ التركيب</string>
+    <string name="alert_battery">البطارية ضعيفة · غيّرها قريباً</string>
     <string name="svc_pick">أي صيانة تمت؟</string>
     <string name="svc_done">%1$s: تمت الآن</string>
     <string name="history_title">الرحلات السابقة</string>
