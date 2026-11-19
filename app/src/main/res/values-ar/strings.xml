@@ -250,6 +250,10 @@
     <string name="radio_retrying">انقطع البث · إعادة الاتصال…</string>
     <string name="radio_paused">متوقف مؤقتاً</string>
     <string name="radio_stopped">متوقف</string>
+    <string name="radio_view_analog">المؤشر</string>
+    <string name="radio_view_digital">المحطات</string>
+    <string name="radio_tune">توليف</string>
+    <string name="radio_dial_empty">لا توجد محطات محفوظة · أضفها من المحطات</string>
     <string name="radio_title">راديو مسار</string>
     <string name="radio_channel">الراديو</string>
 </resources>

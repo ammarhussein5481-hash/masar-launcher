@@ -1,14 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Fifth page: internet radio. Left: what is playing, with big controls.
-     Right: presets and categories as a grid of large station tiles. -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Fifth page: internet radio, in two looks the driver switches between.
+     Digital: what is playing with big controls, and a grid of station tiles.
+     Analog: the presets on a tuning scale with a needle, a knob and preset keys. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/page5"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:baselineAligned="false"
-    android:orientation="horizontal"
     android:padding="14dp"
     android:visibility="invisible">
+
+<LinearLayout
+    android:id="@+id/radioDigital"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:baselineAligned="false"
+    android:orientation="horizontal">
 
     <!-- Now playing -->
     <LinearLayout
@@ -36,6 +42,12 @@
                 android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
                 android:textColor="@color/text_dim" />
+
+            <TextView
+                android:id="@+id/radioToAnalog"
+                style="@style/RadioChip"
+                android:layout_marginEnd="0dp"
+                android:text="@string/radio_view_analog" />
 
             <TextView
                 android:id="@+id/radioStar"
@@ -226,3 +238,190 @@
         </FrameLayout>
     </LinearLayout>
 </LinearLayout>
+
+<!-- Analog look -->
+<LinearLayout
+    android:id="@+id/radioAnalog"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <cloud.ammarhussein.masar.DialView
+        android:id="@+id/radioDial"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="6dp"
+        android:layout_weight="50" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginStart="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_weight="20">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/radioName2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFamily="sans-serif-light"
+                android:gravity="center"
+                android:maxLines="1"
+                android:textColor="@color/text" />
+
+            <TextView
+                android:id="@+id/radioTrack2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:gravity="center"
+                android:maxLines="1"
+                android:textColor="@color/text_dim" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/radioToDigital"
+            style="@style/RadioChip"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginEnd="0dp"
+            android:text="@string/radio_view_digital" />
+    </FrameLayout>
+
+    <!-- Play, the six preset keys, and the tuning knob: always left to right -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_margin="6dp"
+        android:layout_weight="30"
+        android:gravity="center_vertical"
+        android:layoutDirection="ltr"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/radioPlay2"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:layout_marginEnd="18dp"
+            android:background="@drawable/round_bg"
+            android:clickable="true"
+            android:focusable="true"
+            android:contentDescription="@string/np_play_pause"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_np_play" />
+
+        <LinearLayout
+            android:id="@+id/radioKeys"
+            android:layout_width="0dp"
+            android:layout_height="64dp"
+            android:layout_weight="1"
+            android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/radioKey1"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="1"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/radioKey2"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="2"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/radioKey3"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="3"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/radioKey4"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="4"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/radioKey5"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="5"
+                    android:textColor="@color/text" />
+
+                <TextView
+                    android:id="@+id/radioKey6"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="5dp"
+                    android:layout_marginEnd="5dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/tile_bg"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:fontFamily="sans-serif-medium"
+                    android:gravity="center"
+                    android:text="6"
+                    android:textColor="@color/text" />
+        </LinearLayout>
+
+        <cloud.ammarhussein.masar.KnobView
+            android:id="@+id/radioKnob"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:layout_marginStart="18dp"
+            android:contentDescription="@string/radio_tune" />
+    </LinearLayout>
+</LinearLayout>
+
+</FrameLayout>

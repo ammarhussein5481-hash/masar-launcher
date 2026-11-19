@@ -145,6 +145,11 @@ class MainActivity : Activity(), DashCam.Listener {
     /** What each tab has loaded this session, so going back to a tab is instant. */
     private val radioLists = HashMap<String, List<Station>>()
     private var radioGen = 0
+    private lateinit var radioDial: DialView
+    private lateinit var radioKnob: KnobView
+    private lateinit var radioKeys: List<TextView>
+    /** True while a finger that went down on the dial or the knob is still down: it is tuning, not changing page. */
+    private var tuning = false
     private lateinit var pages: List<View>
     private lateinit var dots: List<View>
     private lateinit var carStatus: TextView
@@ -282,6 +287,23 @@ class MainActivity : Activity(), DashCam.Listener {
         )
         for (i in radioTabs.indices) radioTabs[i].setOnClickListener { showRadioTab(i) }
         findViewById<View>(R.id.radioPlay).setOnClickListener { RadioService.toggle(this) }
+        findViewById<View>(R.id.radioPlay2).setOnClickListener { RadioService.toggle(this) }
+        findViewById<View>(R.id.radioToAnalog).setOnClickListener { showRadioLook(true) }
+        findViewById<View>(R.id.radioToDigital).setOnClickListener { showRadioLook(false) }
+        radioDial = findViewById(R.id.radioDial)
+        radioDial.emptyText = getString(R.string.radio_dial_empty)
+        radioDial.onPick = { index -> RadioService.play(this, presets(), index) }
+        radioKnob = findViewById(R.id.radioKnob)
+        radioKnob.onStep = { by -> tuneBy(by) }
+        radioKeys = listOf(
+            findViewById(R.id.radioKey1), findViewById(R.id.radioKey2), findViewById(R.id.radioKey3),
+            findViewById(R.id.radioKey4), findViewById(R.id.radioKey5), findViewById(R.id.radioKey6)
+        )
+        for (i in radioKeys.indices) radioKeys[i].setOnClickListener {
+            val saved = presets()
+            if (i < saved.size) RadioService.play(this, saved, i)
+        }
+        showRadioLook(prefs.getBoolean("radio_analog", false))
         findViewById<View>(R.id.radioPrev).setOnClickListener { RadioService.skip(this, -1) }
         findViewById<View>(R.id.radioNext).setOnClickListener { RadioService.skip(this, 1) }
         findViewById<View>(R.id.radioStar).setOnClickListener { RadioService.station?.let { togglePreset(it) } }
@@ -598,6 +620,11 @@ class MainActivity : Activity(), DashCam.Listener {
      */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (drawer.visibility == View.VISIBLE) return super.dispatchTouchEvent(event)
+        // A finger on the radio dial or its knob is tuning; it must not also turn the page.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            tuning = page == 4 && (touches(radioDial, event) || touches(radioKnob, event))
+        }
+        if (tuning) return super.dispatchTouchEvent(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
@@ -624,6 +651,14 @@ class MainActivity : Activity(), DashCam.Listener {
             MotionEvent.ACTION_CANCEL -> swiping = false
         }
         return if (swiping) true else super.dispatchTouchEvent(event)
+    }
+
+    /** Whether [event] is on [view], which must be showing. */
+    private fun touches(view: View, event: MotionEvent): Boolean {
+        if (!view.isShown) return false
+        val at = IntArray(2)
+        view.getLocationOnScreen(at)
+        return event.rawX >= at[0] && event.rawX < at[0] + view.width && event.rawY >= at[1] && event.rawY < at[1] + view.height
     }
 
     private fun showPage(index: Int) {
@@ -755,6 +790,7 @@ class MainActivity : Activity(), DashCam.Listener {
         carGauge.accent = accent
         camButton.backgroundTintList = ColorStateList.valueOf(accent)
         findViewById<View>(R.id.radioPlay).backgroundTintList = ColorStateList.valueOf(accent)
+        findViewById<View>(R.id.radioPlay2).backgroundTintList = ColorStateList.valueOf(accent)
         if (radioTab >= 0) showRadioTab(radioTab)
         map.accent = accent
         showPage(page)
@@ -1899,8 +1935,55 @@ class MainActivity : Activity(), DashCam.Listener {
         }
     }
 
+    /** Switches the Radio page between the analog dial and the digital station grid. */
+    private fun showRadioLook(analog: Boolean) {
+        prefs.edit().putBoolean("radio_analog", analog).apply()
+        findViewById<View>(R.id.radioAnalog).visibility = if (analog) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.radioDigital).visibility = if (analog) View.GONE else View.VISIBLE
+        renderRadio()
+    }
+
+    /** One click of the tuning knob: the next or previous preset, stopping at the ends of the scale. */
+    private fun tuneBy(by: Int) {
+        val saved = presets()
+        if (saved.isEmpty()) return
+        val at = saved.indexOfFirst { it.url == RadioService.station?.url }
+        val to = if (at < 0) 0 else (at + by).coerceIn(0, saved.size - 1)
+        if (to != at) RadioService.play(this, saved, to)
+    }
+
+    /** The analog look: the presets on the scale, the needle on the one loaded, and the keys. */
+    private fun renderDial() {
+        val saved = presets()
+        val station = RadioService.station
+        val at = saved.indexOfFirst { it.url == station?.url }
+        radioDial.stations = saved.map { it.name }
+        radioDial.selected = at
+        radioDial.accent = accent
+        radioKnob.accent = accent
+        val state = RadioService.state
+        radioDial.status = if (station == null) "" else getString(RadioService.stateText(state))
+        radioDial.statusColor = when (state) {
+            RadioService.PLAYING -> getColor(R.color.ok)
+            RadioService.CONNECTING, RadioService.RETRYING -> accent
+            else -> getColor(R.color.text_dim)
+        }
+        findViewById<TextView>(R.id.radioName2).text = station?.name ?: getString(R.string.radio_pick)
+        findViewById<TextView>(R.id.radioTrack2).text = RadioService.title
+        val play = findViewById<ImageView>(R.id.radioPlay2)
+        play.setImageResource(if (RadioService.sounding) R.drawable.ic_np_pause else R.drawable.ic_np_play)
+        play.alpha = if (station == null) 0.4f else 1f
+        for (i in radioKeys.indices) {
+            val key = radioKeys[i]
+            key.alpha = if (i < saved.size) 1f else 0.35f
+            key.setTextColor(if (i == at) getColor(R.color.on_accent) else getColor(R.color.text))
+            key.backgroundTintList = if (i == at) ColorStateList.valueOf(accent) else null
+        }
+    }
+
     /** Paints the now-playing card from what [RadioService] says, and marks the playing tile. */
     private fun renderRadio() {
+        renderDial()
         val station = RadioService.station
         val state = RadioService.state
         val stateView = findViewById<TextView>(R.id.radioState)
@@ -2242,10 +2325,20 @@ class MainActivity : Activity(), DashCam.Listener {
         artBox.clipToOutline = true
         square(findViewById(R.id.radioPrev), (u * 12f).toInt())
         square(findViewById(R.id.radioNext), (u * 12f).toInt())
-        val radioPlay = findViewById<ImageView>(R.id.radioPlay)
-        square(radioPlay, (u * 16f).toInt())
-        radioPlay.setColorFilter(getColor(R.color.on_accent))
-        radioPlay.backgroundTintList = ColorStateList.valueOf(accent)
+        for (id in intArrayOf(R.id.radioPlay, R.id.radioPlay2)) {
+            val radioPlay = findViewById<ImageView>(id)
+            square(radioPlay, (u * 16f).toInt())
+            radioPlay.setColorFilter(getColor(R.color.on_accent))
+            radioPlay.backgroundTintList = ColorStateList.valueOf(accent)
+        }
+        square(radioKnob, (u * 19f).toInt())
+        val keys = findViewById<View>(R.id.radioKeys)
+        keys.layoutParams = keys.layoutParams.also { it.height = (u * 12f).toInt() }
+        for (key in radioKeys) px(key, 5f)
+        px(findViewById(R.id.radioName2), 5.6f)
+        px(findViewById(R.id.radioTrack2), 3.3f)
+        px(findViewById(R.id.radioToAnalog), 3f)
+        px(findViewById(R.id.radioToDigital), 3.4f)
         px(camButton, 3.8f)
         px(findViewById(R.id.camFrontLabel), 3.2f)
         px(findViewById(R.id.camRearLabel), 3.2f)
