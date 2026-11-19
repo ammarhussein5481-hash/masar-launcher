@@ -1,18 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- One station in the grid: logo (or first letter), name, and a line of detail -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/tile_bg"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingStart="16dp"
-    android:paddingTop="14dp"
-    android:paddingEnd="8dp"
-    android:paddingBottom="14dp">
+    android:padding="10dp">
+
+    <FrameLayout
+        android:id="@+id/stationArtBox"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:background="@drawable/art_bg">
+
+        <TextView
+            android:id="@+id/stationLetter"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:textColor="@color/text" />
+
+        <ImageView
+            android:id="@+id/stationArt"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginStart="10dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -22,7 +44,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:fontFamily="sans-serif-medium"
-            android:maxLines="1"
+            android:maxLines="2"
             android:textColor="@color/text" />
 
         <TextView
@@ -33,17 +55,4 @@
             android:maxLines="1"
             android:textColor="@color/text_dim" />
     </LinearLayout>
-
-    <TextView
-        android:id="@+id/stationStar"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:clickable="true"
-        android:focusable="true"
-        android:paddingStart="14dp"
-        android:paddingTop="6dp"
-        android:paddingEnd="14dp"
-        android:paddingBottom="6dp"
-        android:text="☆"
-        android:textColor="@color/accent" />
 </LinearLayout>
