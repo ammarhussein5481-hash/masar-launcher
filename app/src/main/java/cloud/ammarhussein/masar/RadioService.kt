@@ -92,7 +92,12 @@ class RadioService : Service() {
         }
         wanted = true
         retries = 0
-        Options.prefs(this).edit().putString(PREF_LAST, s.toJson()).apply()
+        // The station and the list it came from, so after a restart Play, the card and the
+        // dial all pick up exactly here.
+        Options.prefs(this).edit()
+            .putString(PREF_LAST, s.toJson())
+            .putString(PREF_LAST_LIST, Station.listToJson(queue))
+            .apply()
         load()
     }
 
@@ -308,6 +313,7 @@ class RadioService : Service() {
         const val ACTION_PREV = "cloud.ammarhussein.masar.RADIO_PREV"
         const val ACTION_STOP = "cloud.ammarhussein.masar.RADIO_STOP"
         const val PREF_LAST = "radio_last"
+        const val PREF_LAST_LIST = "radio_last_list"
         private const val CHANNEL = "radio"
         private const val NOTIFICATION_ID = 2
         // About five minutes of trying before giving up on a stream.
@@ -348,9 +354,9 @@ class RadioService : Service() {
             else -> R.string.radio_stopped
         }
 
-        /** Remembers what to play without starting it (the last station, at launch). */
+        /** Remembers what to play without starting it (the last station, at launch). Not while something is loaded. */
         fun prepare(list: List<Station>, at: Int) {
-            if (current != null || list.isEmpty()) return
+            if (current != null || station != null || list.isEmpty()) return
             queue = list
             index = at.coerceIn(0, list.size - 1)
             station = list[index]

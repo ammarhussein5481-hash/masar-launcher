@@ -339,11 +339,15 @@ class MainActivity : Activity(), DashCam.Listener {
             true
         }
         // The last station is ready behind the Play button from the first moment.
+        // It comes back inside the list it was played from, so the card, Play, the dial and the
+        // knob all agree on it; an older save without the list falls back to the presets.
         Station.fromJson(prefs.getString(RadioService.PREF_LAST, "") ?: "")?.let { last ->
-            val saved = presets()
-            val at = saved.indexOfFirst { it.url == last.url }
-            if (at >= 0) RadioService.prepare(saved, at) else RadioService.prepare(listOf(last), 0)
+            val list = Station.listFromJson(prefs.getString(RadioService.PREF_LAST_LIST, null))
+                .takeIf { saved -> saved.any { it.url == last.url } } ?: presets()
+            val at = list.indexOfFirst { it.url == last.url }
+            if (at >= 0) RadioService.prepare(list, at) else RadioService.prepare(listOf(last), 0)
         }
+        refreshPresetDetails()
         camStatus = findViewById(R.id.camStatus)
         camButton = findViewById(R.id.camButton)
         dashCam = DashCam(this, this)
@@ -2147,6 +2151,34 @@ class MainActivity : Activity(), DashCam.Listener {
 
     // Presets, saved on the unit as a list of station records.
     private fun presets(): List<Station> = Station.listFromJson(prefs.getString("radio_favs", "[]"))
+
+    /**
+     * Presets saved before stations carried a country and genre get them from the station
+     * directory, once, in the background, so their line reads like the rest without a re-save.
+     */
+    private fun refreshPresetDetails() {
+        val old = presets().filter { it.country.isEmpty() && it.genre.isEmpty() && it.uuid.isNotEmpty() }
+        if (old.isEmpty()) return
+        Thread {
+            val fresh = try {
+                Radio.byUuids(old.map { it.uuid })
+            } catch (ex: Exception) {
+                return@Thread
+            }
+            if (fresh.isEmpty()) return@Thread
+            runOnUiThread {
+                val byUuid = fresh.associateBy { it.uuid }
+                // Keep the saved stream; take only the descriptive details.
+                val list = presets().map { s ->
+                    val f = byUuid[s.uuid] ?: return@map s
+                    Station(s.uuid, s.name, s.url, s.codec, f.bitrate, s.hls, s.favicon.ifEmpty { f.favicon }, f.country, f.genre)
+                }
+                prefs.edit().putString("radio_favs", Station.listToJson(list)).apply()
+                if (radioTab == 0) showRadioTab(0)
+                renderRadio()
+            }
+        }.start()
+    }
 
     private fun isPreset(station: Station): Boolean = presets().any { it.url == station.url }
 

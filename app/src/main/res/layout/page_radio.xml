@@ -252,11 +252,15 @@
     android:orientation="vertical"
     android:visibility="gone">
 
+    <!-- Starts further in on the left: the unit's own floating button sits over that edge. -->
     <cloud.ammarhussein.masar.DialView
         android:id="@+id/radioDial"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_margin="6dp"
+        android:layout_marginStart="56dp"
+        android:layout_marginTop="6dp"
+        android:layout_marginEnd="6dp"
+        android:layout_marginBottom="6dp"
         android:layout_weight="50" />
 
     <FrameLayout

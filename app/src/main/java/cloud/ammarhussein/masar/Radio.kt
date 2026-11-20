@@ -31,13 +31,16 @@ class Station(
             if (place.isNotEmpty()) parts.add(place)
         }
         if (genre.isNotEmpty() && genre.length <= 18) parts.add(genre.replaceFirstChar { it.titlecase(java.util.Locale.getDefault()) })
-        if (bitrate > 0) parts.add("${bitrate}k")
+        if (bitrate in 1..MAX_AUDIO_KBPS) parts.add("${bitrate}k")
         // Nothing better known (an older saved preset): the audio format alone, e.g. "AAC".
         if (parts.isEmpty()) codec.substringBefore(',').trim().uppercase(java.util.Locale.US).takeIf { it.isNotEmpty() }?.let { parts.add(it) }
         return parts.joinToString(" · ")
     }
 
     companion object {
+        /** Above this a bitrate is a video stream's figure (an HLS TV channel), not a radio's. */
+        const val MAX_AUDIO_KBPS = 512
+
         fun fromJson(text: String): Station? = try {
             val a = JSONArray(text)
             Station(
@@ -87,44 +90,56 @@ object Radio {
     /** Working stations for one of [CATEGORIES], most listened first. Blocks. */
     fun category(filter: String): List<Station> = fetch(filter)
 
+    /** The directory's current record for each station id, in no particular order. Blocks. */
+    fun byUuids(uuids: List<String>): List<Station> {
+        val ids = uuids.joinToString(",") { URLEncoder.encode(it, "UTF-8") }
+        return parse(get("https://all.api.radio-browser.info/json/stations/byuuid?uuids=$ids"))
+    }
+
     /** Working stations whose name matches [query], anywhere. Blocks. */
     fun search(query: String): List<Station> = fetch("name=" + URLEncoder.encode(query, "UTF-8"))
 
-    private fun fetch(filter: String): List<Station> {
-        val conn = URL("$BASE?$filter&order=clickcount&reverse=true&hidebroken=true&limit=60").openConnection() as HttpURLConnection
+    private fun fetch(filter: String): List<Station> =
+        parse(get("$BASE?$filter&order=clickcount&reverse=true&hidebroken=true&limit=60"))
+
+    private fun get(address: String): String {
+        val conn = URL(address).openConnection() as HttpURLConnection
         conn.connectTimeout = 8000
         conn.readTimeout = 10000
         conn.setRequestProperty("User-Agent", USER_AGENT)
         try {
             if (conn.responseCode != 200) throw java.io.IOException("HTTP " + conn.responseCode)
-            val body = conn.inputStream.bufferedReader().use { it.readText() }
-            val array = JSONArray(body)
-            val out = ArrayList<Station>()
-            val seen = HashSet<String>()
-            for (i in 0 until array.length()) {
-                val o = array.getJSONObject(i)
-                val url = o.optString("url_resolved").ifEmpty { o.optString("url") }
-                val name = o.optString("name").trim().replace(Regex("\\s+"), " ")
-                if (url.isEmpty() || name.isEmpty()) continue
-                // One entry per stream.
-                if (!seen.add(url)) continue
-                out.add(
-                    Station(
-                        o.optString("stationuuid"),
-                        name,
-                        url,
-                        o.optString("codec"),
-                        o.optInt("bitrate"),
-                        o.optInt("hls") == 1,
-                        o.optString("favicon"),
-                        o.optString("countrycode").trim().uppercase(java.util.Locale.US),
-                        o.optString("tags").split(',').map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: ""
-                    )
-                )
-            }
-            return out
+            return conn.inputStream.bufferedReader().use { it.readText() }
         } finally {
             conn.disconnect()
         }
+    }
+
+    private fun parse(body: String): List<Station> {
+        val array = JSONArray(body)
+        val out = ArrayList<Station>()
+        val seen = HashSet<String>()
+        for (i in 0 until array.length()) {
+            val o = array.getJSONObject(i)
+            val url = o.optString("url_resolved").ifEmpty { o.optString("url") }
+            val name = o.optString("name").trim().replace(Regex("\\s+"), " ")
+            if (url.isEmpty() || name.isEmpty()) continue
+            // One entry per stream.
+            if (!seen.add(url)) continue
+            out.add(
+                Station(
+                    o.optString("stationuuid"),
+                    name,
+                    url,
+                    o.optString("codec"),
+                    o.optInt("bitrate"),
+                    o.optInt("hls") == 1,
+                    o.optString("favicon"),
+                    o.optString("countrycode").trim().uppercase(java.util.Locale.US),
+                    o.optString("tags").split(',').map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: ""
+                )
+            )
+        }
+        return out
     }
 }
