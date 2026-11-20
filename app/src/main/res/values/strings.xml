@@ -260,6 +260,9 @@
     <string name="radio_view_analog">Dial</string>
     <string name="radio_view_digital">Stations</string>
     <string name="radio_tune">Tune</string>
+    <string name="radio_key_hold">Hold to save</string>
+    <string name="radio_key_saved">Saved to preset %1$d</string>
+    <string name="radio_key_tip">Hold a preset key to save the station playing</string>
     <string name="radio_dial_empty">No presets yet · add some from Stations</string>
     <string name="radio_title">Masar radio</string>
     <string name="radio_channel">Radio</string>

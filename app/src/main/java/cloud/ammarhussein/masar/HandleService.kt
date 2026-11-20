@@ -750,7 +750,7 @@ class HandleService : Service() {
         private const val NOTIFICATION_ID = 1
 
         /** Bar height, button width and icon sizes, in percent of screen height. On 1200x720 the bar is 76 px tall. */
-        private const val BAR_TALL = 10.5f
+        const val BAR_TALL = 10.5f
         private const val BUTTON_WIDE = 13f
         private const val ICON = 5.6f
         private const val ICON_HOME = 7f

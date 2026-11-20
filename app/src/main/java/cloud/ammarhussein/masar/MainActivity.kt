@@ -148,6 +148,22 @@ class MainActivity : Activity(), DashCam.Listener {
     private lateinit var radioDial: DialView
     private lateinit var radioKnob: KnobView
     private lateinit var radioKeys: List<TextView>
+    /** The stations on the analog scale: the list the station playing came from, else the presets. */
+    private var dialList: List<Station> = emptyList()
+    /** This page's own listener, so a newer copy of the page that took over is not unhooked by this one stopping. */
+    private val radioListener: () -> Unit = { runOnUiThread { renderRadio() } }
+    /** What the radio page last showed, so the watch below repaints only on a change. */
+    private var radioShown = ""
+    /**
+     * While the Radio page is on screen, a light look every 1.5 s at what is playing, in case
+     * a change was missed: the page must never say "Pick a station" over a station playing.
+     */
+    private val radioWatch = object : Runnable {
+        override fun run() {
+            if (page == 4 && radioSignature() != radioShown) renderRadio()
+            ui.postDelayed(this, 1500)
+        }
+    }
     /** True while a finger that went down on the dial or the knob is still down: it is tuning, not changing page. */
     private var tuning = false
     private lateinit var pages: List<View>
@@ -292,16 +308,24 @@ class MainActivity : Activity(), DashCam.Listener {
         findViewById<View>(R.id.radioToDigital).setOnClickListener { showRadioLook(false) }
         radioDial = findViewById(R.id.radioDial)
         radioDial.emptyText = getString(R.string.radio_dial_empty)
-        radioDial.onPick = { index -> RadioService.play(this, presets(), index) }
+        radioDial.onPick = { index -> if (index < dialList.size) RadioService.play(this, dialList, index) }
         radioKnob = findViewById(R.id.radioKnob)
         radioKnob.onStep = { by -> tuneBy(by) }
         radioKeys = listOf(
             findViewById(R.id.radioKey1), findViewById(R.id.radioKey2), findViewById(R.id.radioKey3),
             findViewById(R.id.radioKey4), findViewById(R.id.radioKey5), findViewById(R.id.radioKey6)
         )
-        for (i in radioKeys.indices) radioKeys[i].setOnClickListener {
-            val saved = presets()
-            if (i < saved.size) RadioService.play(this, saved, i)
+        for (i in radioKeys.indices) {
+            radioKeys[i].setOnClickListener {
+                val saved = presets()
+                if (i < saved.size) RadioService.play(this, saved, i)
+                else Toast.makeText(this, R.string.radio_key_tip, Toast.LENGTH_SHORT).show()
+            }
+            // Hold a key to keep the station playing on it, as on a car radio.
+            radioKeys[i].setOnLongClickListener {
+                saveToKey(i)
+                true
+            }
         }
         showRadioLook(prefs.getBoolean("radio_analog", false))
         findViewById<View>(R.id.radioPrev).setOnClickListener { RadioService.skip(this, -1) }
@@ -502,8 +526,10 @@ class MainActivity : Activity(), DashCam.Listener {
     override fun onStart() {
         super.onStart()
         HandleService.homeVisible = true
-        RadioService.onChange = { runOnUiThread { renderRadio() } }
+        RadioService.onChange = radioListener
         renderRadio()
+        ui.removeCallbacks(radioWatch)
+        ui.postDelayed(radioWatch, 1500)
         startGps()
         if (!netRegistered) {
             try {
@@ -565,7 +591,9 @@ class MainActivity : Activity(), DashCam.Listener {
     override fun onStop() {
         super.onStop()
         HandleService.homeVisible = false
-        RadioService.onChange = null
+        // Only unhook if it is still ours: when the page is rebuilt, the new copy starts before the old one stops.
+        if (RadioService.onChange === radioListener) RadioService.onChange = null
+        ui.removeCallbacks(radioWatch)
         stopGps()
         stopMedia()
         stopClipPlayer()
@@ -742,6 +770,7 @@ class MainActivity : Activity(), DashCam.Listener {
     private fun setHandleMode(next: String) {
         prefs.edit().putString(HandleService.PREF_MODE, next).apply()
         updateHandleStatus()
+        clearHomeBar()
         if (next != HandleService.MODE_OFF && !Settings.canDrawOverlays(this)) {
             askForOverlay()
             return
@@ -1943,22 +1972,55 @@ class MainActivity : Activity(), DashCam.Listener {
         renderRadio()
     }
 
-    /** One click of the tuning knob: the next or previous preset, stopping at the ends of the scale. */
+    /** One click of the tuning knob: the next or previous station on the scale, stopping at its ends. */
     private fun tuneBy(by: Int) {
-        val saved = presets()
-        if (saved.isEmpty()) return
-        val at = saved.indexOfFirst { it.url == RadioService.station?.url }
-        val to = if (at < 0) 0 else (at + by).coerceIn(0, saved.size - 1)
-        if (to != at) RadioService.play(this, saved, to)
+        val list = dialList
+        if (list.isEmpty()) return
+        val at = list.indexOfFirst { it.url == RadioService.station?.url }
+        val to = if (at < 0) 0 else (at + by).coerceIn(0, list.size - 1)
+        if (to != at) RadioService.play(this, list, to)
     }
 
-    /** The analog look: the presets on the scale, the needle on the one loaded, and the keys. */
+    /**
+     * Keeps the station playing on preset key [i]. A key that holds a station gets the new one in
+     * its place; an empty key adds it after the last saved one.
+     */
+    private fun saveToKey(i: Int) {
+        val station = RadioService.station
+        if (station == null) {
+            Toast.makeText(this, R.string.radio_pick, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val list = presets().toMutableList()
+        val already = list.indexOfFirst { it.url == station.url }
+        val slot: Int
+        if (i < list.size) {
+            if (already >= 0 && already != i) list.removeAt(already)
+            slot = minOf(i, list.size)
+            if (slot < list.size) list[slot] = station else list.add(station)
+        } else {
+            if (already >= 0) list.removeAt(already)
+            list.add(station)
+            slot = list.size - 1
+        }
+        prefs.edit().putString("radio_favs", Station.listToJson(list)).apply()
+        Toast.makeText(this, getString(R.string.radio_key_saved, slot + 1), Toast.LENGTH_SHORT).show()
+        if (radioTab == 0) showRadioTab(0)
+        renderRadio()
+    }
+
+    /** The analog look: the playing list on the scale, the needle on the one loaded, and the keys. */
     private fun renderDial() {
         val saved = presets()
         val station = RadioService.station
+        val queue = RadioService.list
+        dialList = when {
+            station != null && queue.any { it.url == station.url } -> queue
+            saved.isNotEmpty() -> saved
+            else -> radioStations
+        }
+        radioDial.show(dialList.map { it.name }, dialList.indexOfFirst { it.url == station?.url })
         val at = saved.indexOfFirst { it.url == station?.url }
-        radioDial.stations = saved.map { it.name }
-        radioDial.selected = at
         radioDial.accent = accent
         radioKnob.accent = accent
         val state = RadioService.state
@@ -1975,14 +2037,28 @@ class MainActivity : Activity(), DashCam.Listener {
         play.alpha = if (station == null) 0.4f else 1f
         for (i in radioKeys.indices) {
             val key = radioKeys[i]
-            key.alpha = if (i < saved.size) 1f else 0.35f
+            if (i < saved.size) {
+                key.text = (i + 1).toString()
+                key.alpha = 1f
+            } else {
+                // An empty key says how to fill it.
+                val number = (i + 1).toString()
+                val text = android.text.SpannableString(number + "\n" + getString(R.string.radio_key_hold))
+                text.setSpan(android.text.style.RelativeSizeSpan(0.42f), number.length, text.length, 0)
+                key.text = text
+                key.alpha = 0.6f
+            }
             key.setTextColor(if (i == at) getColor(R.color.on_accent) else getColor(R.color.text))
             key.backgroundTintList = if (i == at) ColorStateList.valueOf(accent) else null
         }
     }
 
+    private fun radioSignature(): String =
+        (RadioService.station?.url ?: "") + "|" + RadioService.state + "|" + RadioService.title + "|" + RadioService.list.size
+
     /** Paints the now-playing card from what [RadioService] says, and marks the playing tile. */
     private fun renderRadio() {
+        radioShown = radioSignature()
         renderDial()
         val station = RadioService.station
         val state = RadioService.state
@@ -2062,11 +2138,8 @@ class MainActivity : Activity(), DashCam.Listener {
             name.text = station.name
             // The one loaded in the player is marked in the accent colour.
             name.setTextColor(if (RadioService.station?.url == station.url) accent else getColor(R.color.text))
-            val info = StringBuilder()
-            if (isPreset(station)) info.append("★ ")
-            if (station.bitrate > 0) info.append(getString(R.string.radio_station_info, station.codec.uppercase(Locale.US).ifEmpty { "—" }, station.bitrate))
-            else info.append(station.codec.uppercase(Locale.US))
-            view.findViewById<TextView>(R.id.stationInfo).text = info
+            val info = station.info()
+            view.findViewById<TextView>(R.id.stationInfo).text = if (isPreset(station)) "★ $info".trim() else info
             showLogo(station, view.findViewById(R.id.stationArt), view.findViewById(R.id.stationLetter))
             return view
         }
@@ -2258,6 +2331,22 @@ class MainActivity : Activity(), DashCam.Listener {
         view.layoutParams = params
     }
 
+    /**
+     * Keeps the Radio page's controls above Masar's own home bar, which floats over the bottom
+     * of the screen (10.5% of its height) whenever it is the bar look.
+     */
+    private fun clearHomeBar() {
+        val page = findViewById<View>(R.id.page5)
+        val pad = page.paddingTop
+        val bottom = if (HandleService.mode(this) == HandleService.MODE_BAR) {
+            val screen = (findViewById<View>(R.id.root).height.takeIf { it > 0 } ?: home.height).toFloat()
+            (screen * HandleService.BAR_TALL / 100f + u * 1.5f).roundToInt()
+        } else {
+            pad
+        }
+        if (page.paddingBottom != bottom) page.setPadding(page.paddingLeft, pad, page.paddingRight, bottom)
+    }
+
     private fun applySizes() {
         val height = home.height
         if (height == 0) return
@@ -2331,7 +2420,9 @@ class MainActivity : Activity(), DashCam.Listener {
             radioPlay.setColorFilter(getColor(R.color.on_accent))
             radioPlay.backgroundTintList = ColorStateList.valueOf(accent)
         }
-        square(radioKnob, (u * 19f).toInt())
+        square(radioKnob, (u * 17f).toInt())
+        px(findViewById(R.id.radioKnobLabel), 2.6f)
+        clearHomeBar()
         val keys = findViewById<View>(R.id.radioKeys)
         keys.layoutParams = keys.layoutParams.also { it.height = (u * 12f).toInt() }
         for (key in radioKeys) px(key, 5f)

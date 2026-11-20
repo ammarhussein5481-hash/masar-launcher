@@ -5,7 +5,10 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-/** One internet radio station. [url] is the playable stream, [favicon] its logo if it has one. */
+/**
+ * One internet radio station. [url] is the playable stream, [favicon] its logo if it has one,
+ * [country] a two-letter code ("SA") and [genre] the directory's first tag, either possibly "".
+ */
 class Station(
     val uuid: String,
     val name: String,
@@ -13,14 +16,34 @@ class Station(
     val codec: String,
     val bitrate: Int,
     val hls: Boolean,
-    val favicon: String = ""
+    val favicon: String = "",
+    val country: String = "",
+    val genre: String = ""
 ) {
-    fun toJson(): String = JSONArray().put(uuid).put(name).put(url).put(codec).put(bitrate).put(hls).put(favicon).toString()
+    fun toJson(): String =
+        JSONArray().put(uuid).put(name).put(url).put(codec).put(bitrate).put(hls).put(favicon).put(country).put(genre).toString()
+
+    /** "Saudi Arabia · Quran · 128k": where it is from, what it plays and how good it sounds, whatever is known. */
+    fun info(): String {
+        val parts = ArrayList<String>()
+        if (country.length == 2) {
+            val place = java.util.Locale("", country).displayCountry
+            if (place.isNotEmpty()) parts.add(place)
+        }
+        if (genre.isNotEmpty() && genre.length <= 18) parts.add(genre.replaceFirstChar { it.titlecase(java.util.Locale.getDefault()) })
+        if (bitrate > 0) parts.add("${bitrate}k")
+        // Nothing better known (an older saved preset): the audio format alone, e.g. "AAC".
+        if (parts.isEmpty()) codec.substringBefore(',').trim().uppercase(java.util.Locale.US).takeIf { it.isNotEmpty() }?.let { parts.add(it) }
+        return parts.joinToString(" · ")
+    }
 
     companion object {
         fun fromJson(text: String): Station? = try {
             val a = JSONArray(text)
-            Station(a.getString(0), a.getString(1), a.getString(2), a.optString(3), a.optInt(4), a.optBoolean(5), a.optString(6))
+            Station(
+                a.getString(0), a.getString(1), a.getString(2), a.optString(3), a.optInt(4), a.optBoolean(5),
+                a.optString(6), a.optString(7), a.optString(8)
+            )
         } catch (ex: Exception) {
             null
         }
@@ -93,7 +116,9 @@ object Radio {
                         o.optString("codec"),
                         o.optInt("bitrate"),
                         o.optInt("hls") == 1,
-                        o.optString("favicon")
+                        o.optString("favicon"),
+                        o.optString("countrycode").trim().uppercase(java.util.Locale.US),
+                        o.optString("tags").split(',').map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: ""
                     )
                 )
             }

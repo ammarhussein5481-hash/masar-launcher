@@ -22,32 +22,43 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 
 /**
- * The analog radio's tuning scale. The preset stations sit along a lit scale
- * that slides under a fixed red needle, as on an old set: drag the scale and
- * let go, and it settles on the nearest station and tunes to it. A tap on a
- * station's name goes straight there.
+ * The analog radio's tuning scale. The stations of the list being played sit along
+ * a lit scale that runs the full width and slides under a fixed red needle, as on an
+ * old set: drag the scale and let go, and it settles on the nearest station and tunes
+ * to it. A tap on a station's name goes straight there.
+ *
+ * Top to bottom: the station names (two rows, above the needle so it never cuts
+ * through them), the needle, the scale with a marker per station, and the station
+ * numbers (below the needle's tip, so it never hides them).
  */
 class DialView @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) : View(context, attrs) {
 
-    /** The names along the scale, in order. */
+    /** The names along the scale, in order. Set with [show]. */
     var stations: List<String> = emptyList()
-        set(v) {
-            if (field != v) {
-                field = v
-                if (!dragging) pos = pos.coerceIn(0f, maxOf(0, v.size - 1).toFloat())
-                invalidate()
-            }
-        }
+        private set
 
-    /** The station tuned in, or -1 when what is playing is not on the scale. */
+    /** The station tuned in, or -1 when what is playing is not on the scale. Set with [show]. */
     var selected = -1
-        set(v) {
-            if (field != v) {
-                field = v
-                if (v >= 0 && !dragging) glide(v.toFloat())
-                invalidate()
+        private set
+
+    /**
+     * Puts [names] on the scale with the needle on [at] (-1 for none). A new list jumps
+     * straight to the station playing; on the same list the scale glides there.
+     */
+    fun show(names: List<String>, at: Int) {
+        if (names != stations) {
+            stations = names
+            selected = at
+            if (!dragging) {
+                animator?.cancel()
+                pos = if (at >= 0) at.toFloat() else pos.coerceIn(0f, maxOf(0, names.size - 1).toFloat())
             }
+        } else if (at != selected) {
+            selected = at
+            if (at >= 0 && !dragging) glide(at.toFloat())
         }
+        invalidate()
+    }
 
     /** A short line in the corner ("Live", "Connecting…") and its colour. */
     var status = ""
@@ -113,7 +124,7 @@ class DialView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
         canvas.drawRect(box, paint)
         paint.shader = null
 
-        val base = h * 0.60f
+        val base = h * BASE
         val n = stations.size
         val step = spacing() / TICKS
 
@@ -132,66 +143,76 @@ class DialView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
             canvas.drawText(status, w - h * 0.075f, h * 0.125f, text)
         }
 
+        // The scale runs the full width whatever the number of stations; past either end of
+        // the list its ticks are dimmed.
+        paint.color = SCALE
+        paint.strokeWidth = h * 0.008f
+        canvas.drawLine(0f, base, w, base, paint)
+        val from = floor((pos - w / 2f / spacing()) * TICKS).toInt()
+        val to = ceil((pos + w / 2f / spacing()) * TICKS).toInt()
+        val firstTick = -TICKS / 2
+        val lastTick = maxOf(0, n - 1) * TICKS + TICKS / 2
+        for (t in from..to) {
+            val x = w / 2f + t * step - pos * spacing()
+            val big = t % TICKS == 0
+            val mid = t % 5 == 0
+            val inside = n > 0 && t in firstTick..lastTick
+            paint.strokeWidth = if (big) h * 0.012f else h * 0.005f
+            paint.alpha = if (!inside) 60 else if (big) 255 else 150
+            canvas.drawLine(x, base, x, base + h * (if (big && inside) 0.1f else if (mid) 0.06f else 0.035f), paint)
+        }
+        paint.alpha = 255
+
         if (n == 0) {
             text.textAlign = Paint.Align.CENTER
             text.typeface = regular
             text.textSize = h * 0.075f
             text.color = CREAM
-            canvas.drawText(emptyText, w / 2f, h * 0.55f, text)
+            canvas.drawText(emptyText, w / 2f, h * 0.36f, text)
+            drawNeedle(canvas, w, h, base)
             canvas.restore()
             return
         }
 
-        // The scale: a tick every twentieth of the way between two stations.
-        val first = -TICKS / 2
-        val last = (n - 1) * TICKS + TICKS / 2
-        paint.color = SCALE
-        paint.strokeWidth = h * 0.008f
-        canvas.drawLine(maxOf(0f, xOf(first / TICKS.toFloat())), base, minOf(w, xOf(last / TICKS.toFloat())), base, paint)
-        val from = maxOf(first, floor((pos - w / 2f / spacing()) * TICKS).toInt())
-        val to = minOf(last, ceil((pos + w / 2f / spacing()) * TICKS).toInt())
-        for (t in from..to) {
-            val x = w / 2f + t * step - pos * spacing()
-            val big = t % TICKS == 0
-            val mid = t % 5 == 0
-            paint.strokeWidth = if (big) h * 0.012f else h * 0.005f
-            paint.alpha = if (big) 255 else 150
-            canvas.drawLine(x, base, x, base + h * (if (big) 0.11f else if (mid) 0.065f else 0.04f), paint)
-        }
-        paint.alpha = 255
-
-        // The stations, on two rows so neighbours don't run into each other.
+        // The stations: name on one of two rows (so neighbours don't run into each other),
+        // a thin line down to a marker on the scale, and the number underneath.
         val nearest = pos.roundToInt()
         text.textAlign = Paint.Align.CENTER
         for (i in 0 until n) {
             val x = xOf(i.toFloat())
             if (x < -spacing() || x > w + spacing()) continue
             val on = i == nearest
-            val y = base - h * (if (i % 2 == 0) 0.11f else 0.27f)
+            val y = h * (if (i % 2 == 0) ROW_LOW else ROW_HIGH)
             paint.color = SCALE
             paint.alpha = 110
             paint.strokeWidth = h * 0.004f
             canvas.drawLine(x, y + h * 0.03f, x, base, paint)
             paint.alpha = 255
+            paint.color = if (on) accent else SCALE
+            canvas.drawCircle(x, base, h * (if (on) 0.024f else 0.017f), paint)
             text.typeface = if (on) medium else regular
             text.textSize = h * (if (on) 0.088f else 0.07f)
             text.color = if (on) accent else CREAM
             val label = TextUtils.ellipsize(stations[i], text, spacing() * 1.7f, TextUtils.TruncateAt.END).toString()
             canvas.drawText(label, x, y, text)
-            text.typeface = regular
-            text.textSize = h * 0.058f
-            text.color = SCALE
-            canvas.drawText((i + 1).toString(), x, base + h * 0.2f, text)
+            text.typeface = if (on) medium else regular
+            text.textSize = h * 0.062f
+            text.color = if (on) accent else SCALE
+            canvas.drawText((i + 1).toString(), x, h * NUMBERS, text)
         }
 
-        // The needle stays put; the scale moves under it.
+        drawNeedle(canvas, w, h, base)
+        canvas.restore()
+    }
+
+    /** The needle stays put in the middle; the scale moves under it. It starts below the names and stops above the numbers. */
+    private fun drawNeedle(canvas: Canvas, w: Float, h: Float, base: Float) {
         paint.color = needle
         paint.strokeWidth = h * 0.014f
         paint.strokeCap = Paint.Cap.ROUND
-        canvas.drawLine(w / 2f, h * 0.2f, w / 2f, h * 0.93f, paint)
-        canvas.drawCircle(w / 2f, h * 0.2f, h * 0.024f, paint)
+        canvas.drawLine(w / 2f, h * NEEDLE_TOP, w / 2f, base + h * 0.13f, paint)
+        canvas.drawCircle(w / 2f, h * NEEDLE_TOP, h * 0.024f, paint)
         paint.strokeCap = Paint.Cap.BUTT
-        canvas.restore()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -249,6 +270,12 @@ class DialView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
 
     private companion object {
         const val TICKS = 20
+        // Heights, as a share of the view's height.
+        const val ROW_LOW = 0.40f
+        const val ROW_HIGH = 0.28f
+        const val NEEDLE_TOP = 0.47f
+        const val BASE = 0.66f
+        const val NUMBERS = 0.92f
         val GLASS_TOP = 0xFF2A2216.toInt()
         val GLASS_BOTTOM = 0xFF15110B.toInt()
         val SCALE = 0xFFC9A55A.toInt()

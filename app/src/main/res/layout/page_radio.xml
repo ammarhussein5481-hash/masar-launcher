@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Fifth page: internet radio, in two looks the driver switches between.
+     The bottom padding is set in code to clear the home bar overlay.
      Digital: what is playing with big controls, and a grid of station tiles.
      Analog: the presets on a tuning scale with a needle, a knob and preset keys. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -168,10 +169,14 @@
         android:layout_weight="62"
         android:orientation="vertical">
 
+        <!-- The fade at an edge says there are more chips that way. -->
         <HorizontalScrollView
+            android:id="@+id/radioTabsScroll"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_margin="6dp"
+            android:fadingEdgeLength="48dp"
+            android:requiresFadingEdge="horizontal"
             android:scrollbars="none">
 
             <LinearLayout
@@ -415,12 +420,29 @@
                     android:textColor="@color/text" />
         </LinearLayout>
 
-        <cloud.ammarhussein.masar.KnobView
-            android:id="@+id/radioKnob"
-            android:layout_width="88dp"
-            android:layout_height="88dp"
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginStart="18dp"
-            android:contentDescription="@string/radio_tune" />
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <cloud.ammarhussein.masar.KnobView
+                android:id="@+id/radioKnob"
+                android:layout_width="88dp"
+                android:layout_height="88dp"
+                android:contentDescription="@string/radio_tune" />
+
+            <TextView
+                android:id="@+id/radioKnobLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.1"
+                android:text="@string/radio_tune"
+                android:textAllCaps="true"
+                android:textColor="@color/text_dim" />
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>
 

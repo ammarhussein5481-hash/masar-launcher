@@ -331,6 +331,8 @@ class RadioService : Service() {
             private set
         private var queue: List<Station> = emptyList()
         private var index = 0
+        /** The list the station loaded was started from (a tab's stations, or the presets). */
+        val list: List<Station> get() = queue
 
         /** True while sound is playing or being fetched. */
         val sounding: Boolean get() = state == PLAYING || state == CONNECTING || state == RETRYING
