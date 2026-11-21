@@ -2209,7 +2209,8 @@ class MainActivity : Activity(), DashCam.Listener {
     /**
      * BBC Arabic Radio's old Akamai address ("…/manifesto/…/bbc_arabic_radio.m3u8") now answers
      * 410 Gone. A preset, last station or cached list still holding it gets the stream the
-     * directory lists today, once, in the background; the preset keeps its key.
+     * directory lists today (or, if it does not answer, BBC's own Icecast stream), once, in the
+     * background; the preset keeps its key.
      */
     private fun replaceDeadBbcArabic() {
         fun dead(s: Station) = s.url.contains("bbci.co.uk/media/live/manifesto") && s.url.contains("bbc_arabic_radio")
@@ -2224,7 +2225,7 @@ class MainActivity : Activity(), DashCam.Listener {
                 }
             } catch (ex: Exception) {
                 null
-            } ?: return@Thread
+            } ?: BBC_ARABIC
             runOnUiThread {
                 val edit = prefs.edit()
                 for (k in keys) {
@@ -3189,6 +3190,11 @@ class MainActivity : Activity(), DashCam.Listener {
          * package in each list wins. The last tile is always "All apps".
          */
         private const val PREF_RADIO_TAB = "radio_last_tab"
+        /** BBC Arabic Radio's current stream (MP3, 56k), should the directory not answer. */
+        private val BBC_ARABIC = Station(
+            "", "BBC Arabic Radio", "https://stream.live.vc.bbcmedia.co.uk/bbc_arabic_radio",
+            "MP3", 56, false, "", "GB", "news"
+        )
         private val DEFAULTS: List<List<String>> = listOf(
             listOf(AUTOKIT),
             listOf("com.google.android.apps.maps", "com.waze", "com.sygic.aura"),
