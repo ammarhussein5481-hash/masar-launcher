@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Masar · a launcher for car head units</title>
-<meta name="description" content="Masar is a home screen for Android car head units: big tiles, GPS speed, a drive page, live engine data from an OBD dongle, and a home bar that works over CarPlay.">
+<meta name="description" content="Masar is a home screen for Android car head units: big tiles, GPS speed, a drive page, live engine data from an OBD dongle, a dash cam page, internet radio, and a home bar that works over CarPlay.">
 <meta property="og:title" content="Masar · a launcher for car head units">
 <meta property="og:description" content="Big tiles, GPS speed, live engine data, and a way home from CarPlay.">
 <meta property="og:image" content="https://masar.ammarhussein.cloud/img/home.png">
@@ -114,6 +114,7 @@ code{font:14.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background
     <div class="card"><span class="k">Car</span><h3>Live engine data</h3><p>With a Bluetooth OBD dongle: RPM, coolant and transmission temperature, battery, fuel, consumption, and fault codes in plain words.</p></div>
     <div class="card"><span class="k">Warnings</span><h3>It tells you, wherever you are</h3><p>Engine or transmission running hot, charging voltage off, a soft tyre or a new fault code: a red banner on top of whatever is on screen.</p></div>
     <div class="card"><span class="k">Dash cam</span><h3>Front and rear, on the big screen</h3><p>Watch your dash cam live and play back its recordings without taking out your phone. Tested with the 70mai A800S.</p></div>
+    <div class="card"><span class="k">Radio</span><h3>Internet radio, two ways</h3><p>Saudi, Quran, news and music stations with presets. A modern station grid, or a classic tuning dial with a needle and a knob.</p></div>
     <div class="card"><span class="k">Drive</span><h3>Compass, map and weather</h3><p>A course-up compass, a small map that follows the car, and a three-day forecast for where you are.</p></div>
     <div class="card"><span class="k">Trips</span><h3>Distance, fuel and cost</h3><p>Each drive is counted by itself: distance, time, average, fuel burned and what it cost. Past trips are kept, with where each one ended.</p></div>
     <div class="card"><span class="k">Daily</span><h3>Prayer times, offline</h3><p>The next prayer and the time left, worked out on the unit with the Umm al-Qura method. No internet needed.</p></div>
@@ -129,18 +130,22 @@ code{font:14.5px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background
       <div class="shot"><img loading="lazy" src="../img/drive.png" width="1200" height="720" alt="Drive page: compass, map and weather"></div>
     </div>
     <div class="row flip">
-      <div class="txt"><h3>Car</h3><p>What the engine is doing, read through a classic-Bluetooth ELM327 dongle in the OBD port.</p><ul><li>Readings the car doesn't report get no tile</li><li>Fuel use live and per trip, range, and cost at your petrol price</li><li>Fault codes with names, and a button to clear them</li><li>Oil life and service reminders</li></ul></div>
+      <div class="txt"><h3>Car</h3><p>What the engine is doing, read through a classic-Bluetooth ELM327 dongle in the OBD port.</p><ul><li>Readings the car doesn't report get no tile</li><li>Fuel use live and per trip, range, and cost at your petrol price</li><li>Fault codes with names, and a button to clear them</li><li>Oil life and service reminders</li><li>Battery health from its voltage at each start, and its age</li></ul></div>
       <div class="shot"><img loading="lazy" src="../img/car.png" width="1200" height="720" alt="Car page: rev counter, engine readings, fault codes, trip and service"></div>
     </div>
     <div class="row">
-      <div class="txt"><h3>Dash cam</h3><p>Your dash cam on the head unit's screen, over the camera's own Wi-Fi.</p><ul><li>Front and rear live, side by side; tap one to enlarge it</li><li>Recorded clips listed with thumbnails, driving and event clips apart</li><li>Play a clip straight from the camera, no copying first</li><li>Close the camera and the unit goes back to your usual Wi-Fi</li></ul></div>
+      <div class="txt"><h3>Dash cam</h3><p>Your dash cam on the head unit's screen, over the camera's own Wi-Fi.</p><ul><li>Front and rear live, side by side; tap one to enlarge it</li><li>Recorded clips from both cameras, listed with thumbnails, driving and event clips apart</li><li>Play a clip straight from the camera, no copying first</li><li>Save a clip and share it, to WhatsApp for example</li><li>Close the camera and the unit goes back to your usual Wi-Fi</li></ul></div>
       <div class="shot"><img loading="lazy" src="../img/cam.png" width="1200" height="720" alt="Dash cam page: front and rear cameras live side by side"></div>
     </div>
     <div class="row flip">
+      <div class="txt"><h3>Radio</h3><p>Internet radio over your phone's hotspot, in the look you prefer.</p><ul><li>Stations by category, search, and your own presets</li><li>A classic dial: drag the scale, turn the knob, or press a preset key</li><li>The song title where the station sends it</li><li>A dropped stream reconnects by itself</li><li>Keeps playing behind other apps, and pauses for calls</li></ul></div>
+      <div><div class="shot"><img loading="lazy" src="../img/radio.png" width="1200" height="720" alt="Radio page: now playing card and a grid of stations"></div><div class="shot" style="margin-top:14px"><img loading="lazy" src="../img/radio-dial.png" width="1200" height="720" alt="Radio page in the analog look: a tuning scale with a needle, preset keys and a knob"></div></div>
+    </div>
+    <div class="row">
       <div class="txt"><h3>Home bar</h3><p>Full-screen apps hide the unit's own buttons. Masar gives them back when you ask, and only then.</p><ul><li>Touch anywhere: the bar shows for four seconds</li><li>Home, Back, Recents, volume, and your first three apps</li><li>Or a small pill instead, if you prefer</li></ul></div>
       <div class="shot"><img loading="lazy" src="../img/bar.png" width="1200" height="720" alt="The home bar shown over a navigation app"></div>
     </div>
-    <div class="row">
+    <div class="row flip">
       <div class="txt"><h3>Warnings</h3><p>Masar keeps watching the car while CarPlay is in front, and speaks up only when something is past normal.</p><ul><li>One beep when a warning starts</li><li>The banner stays until the value is back to normal</li><li>Speed alert at a limit you choose</li></ul></div>
       <div class="shot"><img loading="lazy" src="../img/warning.png" width="1200" height="720" alt="A red warning banner shown over a navigation app"></div>
     </div>
