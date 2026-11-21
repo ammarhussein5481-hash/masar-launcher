@@ -9,6 +9,7 @@ import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
@@ -101,13 +102,39 @@ class KnobView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
     private fun touchAngle(event: MotionEvent): Float =
         Math.toDegrees(atan2((event.y - height / 2f).toDouble(), (event.x - width / 2f).toDouble())).toFloat()
 
+    /**
+     * Grows the knob under the finger, so it is easy to see turning, and back on lift. It grows
+     * from near its lower right, so at the corner of the screen it spreads left and up, on screen.
+     */
+    private fun zoom(on: Boolean) {
+        pivotX = width * 0.8f
+        pivotY = height * 0.6f
+        val to = if (on) ZOOM else 1f
+        animate().scaleX(to).scaleY(to).translationZ(if (on) 24f else 0f).setDuration(140).start()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // The zoomed knob reaches past its own box: let the layouts around it draw it whole, up to
+        // the page (knob column, keys row, analog look, page), so the page padding does not cut it.
+        var p = parent
+        repeat(4) {
+            val group = p as? ViewGroup ?: return
+            group.clipChildren = false
+            group.clipToPadding = false
+            p = group.parent
+        }
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouch = touchAngle(event)
                 pending = 0f
                 parent?.requestDisallowInterceptTouchEvent(true)
+                zoom(true)
             }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> zoom(false)
             MotionEvent.ACTION_MOVE -> {
                 val now = touchAngle(event)
                 var delta = now - lastTouch
@@ -133,5 +160,6 @@ class KnobView @JvmOverloads constructor(context: Context, attrs: AttributeSet? 
 
     private companion object {
         const val STEP = 30f
+        const val ZOOM = 1.7f
     }
 }

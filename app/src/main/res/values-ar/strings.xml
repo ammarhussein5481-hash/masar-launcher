@@ -248,6 +248,7 @@
     <string name="radio_live">● مباشر</string>
     <string name="radio_connecting">جارٍ الاتصال…</string>
     <string name="radio_retrying">انقطع البث · إعادة الاتصال…</string>
+    <string name="radio_station_offline">المحطة متوقفة</string>
     <string name="radio_paused">متوقف مؤقتاً</string>
     <string name="radio_stopped">متوقف</string>
     <string name="radio_view_analog">المؤشر</string>

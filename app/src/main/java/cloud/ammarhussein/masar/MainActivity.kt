@@ -290,7 +290,10 @@ class MainActivity : Activity(), DashCam.Listener {
         radioGrid = findViewById(R.id.radioGrid)
         radioGrid.adapter = stationAdapter
         radioGrid.setOnItemClickListener { _, _, position, _ ->
-            if (position < radioStations.size) RadioService.play(this, radioStations, position)
+            if (position < radioStations.size) {
+                prefs.edit().putInt(PREF_RADIO_TAB, radioTab).apply()
+                RadioService.play(this, radioStations, position)
+            }
         }
         // A long press keeps a station as a preset, or drops it.
         radioGrid.setOnItemLongClickListener { _, _, position, _ ->
@@ -318,7 +321,10 @@ class MainActivity : Activity(), DashCam.Listener {
         for (i in radioKeys.indices) {
             radioKeys[i].setOnClickListener {
                 val saved = presets()
-                if (i < saved.size) RadioService.play(this, saved, i)
+                if (i < saved.size) {
+                    prefs.edit().putInt(PREF_RADIO_TAB, 0).apply()
+                    RadioService.play(this, saved, i)
+                }
                 else Toast.makeText(this, R.string.radio_key_tip, Toast.LENGTH_SHORT).show()
             }
             // Hold a key to keep the station playing on it, as on a car radio.
@@ -348,6 +354,7 @@ class MainActivity : Activity(), DashCam.Listener {
             if (at >= 0) RadioService.prepare(list, at) else RadioService.prepare(listOf(last), 0)
         }
         refreshPresetDetails()
+        replaceDeadBbcArabic()
         camStatus = findViewById(R.id.camStatus)
         camButton = findViewById(R.id.camButton)
         dashCam = DashCam(this, this)
@@ -712,8 +719,9 @@ class MainActivity : Activity(), DashCam.Listener {
         if (index == 2) renderCar()
         if (index == 4) {
             renderRadio()
-            // First visit: the presets if there are any, otherwise the Saudi stations.
-            if (radioTab < 0) showRadioTab(if (presets().isEmpty()) 1 else 0)
+            // First visit: the tab the loaded station came from, so the list matches the dial;
+            // with nothing loaded, the presets if there are any, otherwise the Saudi stations.
+            if (radioTab < 0) showRadioTab(restoredTab() ?: if (presets().isEmpty()) 1 else 0)
         }
         // Leaving the camera page gives the Wi-Fi back to the hotspot.
         if (index != 3 && from == 3) {
@@ -1957,6 +1965,24 @@ class MainActivity : Activity(), DashCam.Listener {
         }.start()
     }
 
+    /**
+     * The tab the loaded station was picked from, after a restart: the one saved when it was
+     * played, or (a save from before that was kept) the tab whose list holds the dial's stations.
+     */
+    private fun restoredTab(): Int? {
+        val station = RadioService.station ?: return null
+        val queue = RadioService.list.map { it.url }
+        if (station.url !in queue) return null
+        fun holds(tab: Int): Boolean {
+            val list = if (tab == 0) presets() else Station.listFromJson(prefs.getString("radio_list_$tab", null))
+            return list.any { it.url == station.url }
+        }
+        val saved = prefs.getInt(PREF_RADIO_TAB, -1)
+        if (saved in 0..4 && holds(saved)) return saved
+        if (queue == presets().map { it.url }) return 0
+        return (1..4).firstOrNull { holds(it) } ?: if (holds(0)) 0 else null
+    }
+
     private fun showStations(message: String) {
         stationAdapter.notifyDataSetChanged()
         val empty = findViewById<TextView>(R.id.radioEmpty)
@@ -2175,6 +2201,40 @@ class MainActivity : Activity(), DashCam.Listener {
                 }
                 prefs.edit().putString("radio_favs", Station.listToJson(list)).apply()
                 if (radioTab == 0) showRadioTab(0)
+                renderRadio()
+            }
+        }.start()
+    }
+
+    /**
+     * BBC Arabic Radio's old Akamai address ("…/manifesto/…/bbc_arabic_radio.m3u8") now answers
+     * 410 Gone. A preset, last station or cached list still holding it gets the stream the
+     * directory lists today, once, in the background; the preset keeps its key.
+     */
+    private fun replaceDeadBbcArabic() {
+        fun dead(s: Station) = s.url.contains("bbci.co.uk/media/live/manifesto") && s.url.contains("bbc_arabic_radio")
+        val keys = listOf("radio_favs", RadioService.PREF_LAST_LIST) + (1..4).map { "radio_list_$it" }
+        val holds = keys.any { k -> Station.listFromJson(prefs.getString(k, null)).any { dead(it) } } ||
+            Station.fromJson(prefs.getString(RadioService.PREF_LAST, "") ?: "")?.let { dead(it) } == true
+        if (!holds) return
+        Thread {
+            val fresh = try {
+                Radio.search("BBC Arabic").firstOrNull { s ->
+                    s.name.contains("bbc", true) && (s.name.contains("arabic", true) || s.name.contains("عربي")) && !dead(s)
+                }
+            } catch (ex: Exception) {
+                null
+            } ?: return@Thread
+            runOnUiThread {
+                val edit = prefs.edit()
+                for (k in keys) {
+                    val list = Station.listFromJson(prefs.getString(k, null))
+                    if (list.any { dead(it) }) edit.putString(k, Station.listToJson(list.map { if (dead(it)) fresh else it }))
+                }
+                Station.fromJson(prefs.getString(RadioService.PREF_LAST, "") ?: "")?.let { if (dead(it)) edit.putString(RadioService.PREF_LAST, fresh.toJson()) }
+                edit.apply()
+                RadioService.replace(::dead, fresh)
+                if (radioTab >= 0) showRadioTab(radioTab)
                 renderRadio()
             }
         }.start()
@@ -3128,6 +3188,7 @@ class MainActivity : Activity(), DashCam.Listener {
          * What each tile holds until the user changes it: the first installed
          * package in each list wins. The last tile is always "All apps".
          */
+        private const val PREF_RADIO_TAB = "radio_last_tab"
         private val DEFAULTS: List<List<String>> = listOf(
             listOf(AUTOKIT),
             listOf("com.google.android.apps.maps", "com.waze", "com.sygic.aura"),

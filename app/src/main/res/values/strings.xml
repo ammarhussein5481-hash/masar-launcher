@@ -255,6 +255,7 @@
     <string name="radio_live">● Live</string>
     <string name="radio_connecting">Connecting…</string>
     <string name="radio_retrying">Signal lost · reconnecting…</string>
+    <string name="radio_station_offline">Station offline</string>
     <string name="radio_paused">Paused</string>
     <string name="radio_stopped">Stopped</string>
     <string name="radio_view_analog">Dial</string>

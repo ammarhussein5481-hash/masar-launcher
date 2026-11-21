@@ -23,6 +23,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.HttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
@@ -184,7 +185,9 @@ class RadioService : Service() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                if (wanted) again()
+                if (!wanted) return
+                // 404 or 410: the stream is gone for good, so retrying only shows a false hope.
+                if (gone(error)) offline() else again()
             }
 
             override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) {
@@ -199,6 +202,25 @@ class RadioService : Service() {
         })
         player = built
         return built
+    }
+
+    /** True when the server says the stream no longer exists (HTTP 404 or 410), not just that it dropped. */
+    private fun gone(error: PlaybackException): Boolean {
+        var cause: Throwable? = error
+        while (cause != null) {
+            if (cause is HttpDataSource.InvalidResponseCodeException) return cause.responseCode == 404 || cause.responseCode == 410
+            cause = cause.cause
+        }
+        return false
+    }
+
+    /** Stops for good on a station that is gone, and says so. Play tries it once more. */
+    private fun offline() {
+        wanted = false
+        ui.removeCallbacks(retry)
+        player?.stop()
+        state = OFFLINE
+        publish()
     }
 
     /** The stream dropped: wait a little longer each time, then try it again. */
@@ -324,6 +346,7 @@ class RadioService : Service() {
         const val PLAYING = 2
         const val PAUSED = 3
         const val RETRYING = 4
+        const val OFFLINE = 5
 
         private var current: RadioService? = null
 
@@ -351,7 +374,18 @@ class RadioService : Service() {
             CONNECTING -> R.string.radio_connecting
             RETRYING -> R.string.radio_retrying
             PAUSED -> R.string.radio_paused
+            OFFLINE -> R.string.radio_station_offline
             else -> R.string.radio_stopped
+        }
+
+        /** Puts [fresh] in place of every loaded station matching [old] (a stream that moved). Main thread. */
+        fun replace(old: (Station) -> Boolean, fresh: Station) {
+            if (queue.any(old)) queue = queue.map { if (old(it)) fresh else it }
+            val s = station ?: return
+            if (!old(s)) return
+            station = fresh
+            if (state == OFFLINE) state = STOPPED
+            onChange?.invoke()
         }
 
         /** Remembers what to play without starting it (the last station, at launch). Not while something is loaded. */
